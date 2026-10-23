@@ -1,45 +1,119 @@
-from pathlib import Path
-
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
-
-app = FastAPI(title="WEEX Farsi Scanner")
-
-BASE_DIR = Path(__file__).resolve().parent
-INDEX_FILE = BASE_DIR / "static" / "index.html"
-
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-    if not INDEX_FILE.is_file():
-        return HTMLResponse(
-            content="""
-            <html lang="fa" dir="rtl">
-            <meta charset="utf-8">
-            <title>خطای اسکنر</title>
-            <body style="font-family: sans-serif; padding: 30px">
-                <h2>فایل صفحه اصلی پیدا نشد!</h2>
-                <p>بررسی کن فایل index.html داخل پوشه static باشد.</p>
-            </body>
-            </html>
-            """,
-            status_code=500,
-        )
-
-    return HTMLResponse(
-        content=INDEX_FILE.read_text(encoding="utf-8")
-    )
-
-
-@app.get("/health")
-def health():
-    return {
-        "status": "ok",
-        "message": "WEEX Farsi Scanner is running",
-        "index_file_exists": INDEX_FILE.is_file(),
-    }
-
-
-@app.get("/favicon.ico")
-def favicon():
-    return JSONResponse({}, status_code=204)
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>اسکنر فارسی WEEX</title>
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root{--bg:#0b1220;--panel:#121d30;--line:#24334b;--txt:#e8eef8;--muted:#91a2bc;--green:#35d39a;--red:#ff6878;--blue:#6fa8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Tahoma,Arial,sans-serif}
+header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:7px}
+main{max-width:1400px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.card,.box{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px}.label{font-size:12px;color:var(--muted)}.value{font-size:20px;font-weight:bold;margin-top:9px}
+.controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px}
+label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:12px}
+input,select,button{background:#0d1728;color:var(--txt);border:1px solid #30425e;border-radius:8px;padding:10px;font:inherit}
+button{cursor:pointer;background:#1d4f91;border-color:#2f6db7}button:hover{filter:brightness(1.15)}
+.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px}
+#chart{height:440px;width:100%}.pill{display:inline-block;padding:5px 9px;border-radius:20px;background:#183b35;color:var(--green);font-size:12px}
+.row{padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.row:last-child{border:0}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.checks label{flex-direction:row;align-items:center;color:var(--txt)}
+.muted{color:var(--muted);font-size:12px;line-height:1.8}.notice{color:#ffcf70;background:#3a2e18;padding:10px;border-radius:8px;font-size:12px;line-height:1.8;margin-top:12px}
+@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.layout{grid-template-columns:1fr}#chart{height:350px}main{padding:12px}}
+</style></head>
+<body>
+<header><div><h1>📡 اسکنر حرفه‌ای WEEX</h1><div class="sub">پنل فارسی · بازار فیوچرز USDT · تحلیل تکنیکال و هشدار تلگرام</div></div><span id="status" class="pill">آماده اتصال</span></header>
+<main>
+<div class="grid">
+ <div class="card"><div class="label">نماد</div><div class="value" id="symCard">BTCUSDT</div></div>
+ <div class="card"><div class="label">آخرین قیمت کندل</div><div class="value" id="price">—</div></div>
+ <div class="card"><div class="label">تایم‌فریم</div><div class="value" id="tfCard">۱۵ دقیقه</div></div>
+ <div class="card"><div class="label">وضعیت تحلیل</div><div class="value" id="signal">در انتظار داده</div></div>
+</div>
+<div class="box controls">
+<label>نماد فیوچرز USDT<input id="symbol" value="BTCUSDT" maxlength="24"></label>
+<label>تایم‌فریم<select id="interval"><option value="5m">۵ دقیقه</option><option value="15m" selected>۱۵ دقیقه</option><option value="30m">۳۰ دقیقه</option><option value="1h">۱ ساعت</option><option value="4h">۴ ساعت</option><option value="1d">روزانه</option></select></label>
+<label>تعداد کندل<select id="limit"><option>100</option><option selected>200</option><option>500</option></select></label>
+<button onclick="loadData()">دریافت نمودار</button><button onclick="analyze()">تحلیل الگوها</button>
+</div>
+<div class="layout">
+ <section class="box"><h3>📈 نمودار کندل و خطوط تحلیل</h3><div id="chart"></div><div class="muted">خطوط روند و نواحی الگو بر اساس نقاط چرخش قیمت تخمینی رسم می‌شوند؛ برای تأیید، منتظر بسته‌شدن کندل بمانید.</div></section>
+ <aside class="box"><h3>🧭 تنظیمات اسکنر</h3>
+ <div class="checks">
+  <label><input type="checkbox" id="triUp" checked> مثلث صعودی</label>
+  <label><input type="checkbox" id="triDown" checked> مثلث نزولی</label>
+  <label><input type="checkbox" id="triSym" checked> مثلث متقارن</label>
+  <label><input type="checkbox" id="trend" checked> خط روند</label>
+  <label><input type="checkbox" id="breakout" checked> شکست و پولبک</label>
+  <label><input type="checkbox" id="fake" checked> بررسی شکست فیک</label>
+  <label><input type="checkbox" id="volume"> فیلتر حجم</label>
+ </div>
+ <h3>🔎 نتیجه تحلیل</h3><div id="results"><div class="row">برای شروع روی «تحلیل الگوها» بزنید.</div></div>
+ <h3>🔔 تلگرام</h3><button onclick="telegramTest()">آزمایش ارسال پیام</button><div id="tgResult" class="muted"></div>
+ <div class="notice">این نسخه فقط تحلیل و نمایش داده انجام می‌دهد؛ معامله خودکار ندارد. پیش از استفاده واقعی، API و منطق الگوها باید روی داده‌های WEEX آزمون شوند.</div>
+ </aside>
+</div>
+</main>
+<script>
+let chart, candleSeries, candles=[];
+function initChart(){
+ const el=document.getElementById('chart');
+ chart=LightweightCharts.createChart(el,{layout:{background:{color:'#121d30'},textColor:'#c8d5e8'},grid:{vertLines:{color:'#1d2b40'},horzLines:{color:'#1d2b40'}},rightPriceScale:{borderColor:'#30425e'},timeScale:{borderColor:'#30425e',timeVisible:true},crosshair:{mode:1}});
+ candleSeries=chart.addCandlestickSeries({upColor:'#35d39a',downColor:'#ff6878',borderUpColor:'#35d39a',borderDownColor:'#ff6878',wickUpColor:'#35d39a',wickDownColor:'#ff6878'});
+ new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth})).observe(el);
+}
+function fa(n){return Number(n).toLocaleString('fa-IR',{maximumFractionDigits:8})}
+async function loadData(){
+ const symbol=document.getElementById('symbol').value.trim().toUpperCase(), interval=document.getElementById('interval').value, limit=document.getElementById('limit').value;
+ document.getElementById('status').textContent='در حال دریافت داده…';
+ try{
+  const r=await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`), d=await r.json();
+  if(d.error) throw Error(d.error);
+  candles=d.candles;candleSeries.setData(candles);chart.timeScale().fitContent();
+  document.getElementById('symCard').textContent=symbol;document.getElementById('tfCard').textContent=interval;
+  document.getElementById('price').textContent=fa(candles.at(-1).close);document.getElementById('status').textContent='داده دریافت شد';
+  analyze();
+ }catch(e){document.getElementById('status').textContent='خطا در اتصال';document.getElementById('results').innerHTML=`<div class="row">${e.message}</div>`}
+}
+function pivots(field, high=true){
+ const out=[];for(let i=2;i<candles.length-2;i++){let v=candles[i][field],ok=true;for(let j=i-2;j<=i+2;j++){if(i!==j&&((high&&candles[j][field]>=v)||(!high&&candles[j][field]<=v))){ok=false;break}}if(ok)out.push({time:candles[i].time,value:v,index:i})}return out.slice(-5)
+}
+function lineBetween(a,b,color,title){
+ if(!a||!b||a.time===b.time)return;
+ const vals=candles.filter(c=>c.time>=a.time&&c.time<=b.time).map(c=>({time:c.time,value:a.value+(b.value-a.value)*(c.time-a.time)/(b.time-a.time)}));
+ if(vals.length>1){const s=chart.addLineSeries({color,lineWidth:2,title,priceLineVisible:false,lastValueVisible:false});s.setData(vals)}
+}
+function analyze(){
+ if(candles.length<30)return;
+ chart.removeSeries; // خطوط قبلی با بازسازی نمودار در بارگذاری بعدی پاک می‌شوند؛ در تحلیل مجدد فقط نتیجه متنی تازه می‌شود.
+ const highs=pivots('high',true), lows=pivots('low',false), last=candles.at(-1), prev=candles.at(-2), findings=[];
+ const enabled=id=>document.getElementById(id).checked;
+ if(enabled('trend')&&highs.length>=2&&lows.length>=2){lineBetween(highs.at(-2),highs.at(-1),'#ffb454','روند سقف‌ها');lineBetween(lows.at(-2),lows.at(-1),'#6fa8ff','روند کف‌ها');findings.push('خطوط روند بر پایه دو سقف و دو کف اخیر رسم شد.')}
+ if(highs.length>=2&&lows.length>=2){
+  const h1=highs.at(-2),h2=highs.at(-1),l1=lows.at(-2),l2=lows.at(-1);
+  const flatHigh=Math.abs(h2.value-h1.value)/h1.value<0.012, flatLow=Math.abs(l2.value-l1.value)/l1.value<0.012;
+  const risingLow=l2.value>l1.value, fallingHigh=h2.value<h1.value;
+  if(enabled('triUp')&&flatHigh&&risingLow)findings.push('احتمال مثلث صعودی؛ نیازمند تأیید شکست مقاومت.');
+  if(enabled('triDown')&&flatLow&&fallingHigh)findings.push('احتمال مثلث نزولی؛ نیازمند تأیید شکست حمایت.');
+  if(enabled('triSym')&&risingLow&&fallingHigh)findings.push('احتمال مثلث متقارن؛ منتظر شکست معتبر بمانید.');
+ }
+ let breakoutText='شکست تأییدشده‌ای تشخیص داده نشد.';
+ if(enabled('breakout')&&highs.length&&lows.length){
+  const resistance=highs.at(-1).value,support=lows.at(-1).value;
+  if(last.close>resistance&&prev.close<=resistance)breakoutText='شکست صعودی سطح اخیر دیده شد؛ پولبک هنوز باید جداگانه تأیید شود.';
+  else if(last.close<support&&prev.close>=support)breakoutText='شکست نزولی سطح اخیر دیده شد؛ پولبک هنوز باید جداگانه تأیید شود.';
+ }
+ findings.push(breakoutText);
+ if(enabled('fake'))findings.push('فیلتر شکست فیک: این نسخه بررسی اولیه دارد؛ تشخیص قطعی ممکن نیست.');
+ if(enabled('volume')){const avg=candles.slice(-21,-1).reduce((s,c)=>s+c.volume,0)/20;findings.push(last.volume>avg?'حجم کندل آخر بالاتر از میانگین ۲۰ کندل است.':'حجم کندل آخر از میانگین ۲۰ کندل بالاتر نیست.')}
+ document.getElementById('signal').textContent=last.close>last.open?'کندل آخر صعودی':last.close<last.open?'کندل آخر نزولی':'کندل خنثی';
+ document.getElementById('results').innerHTML=findings.map(x=>`<div class="row">• ${x}</div>`).join('');
+}
+async function telegramTest(){
+ const out=document.getElementById('tgResult');out.textContent='در حال آزمایش…';
+ try{const r=await fetch('/api/telegram-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'🔔 آزمایش ربات اسکنر فارسی WEEX'})});const d=await r.json();out.textContent=d.message}
+ catch(e){out.textContent='خطا: '+e.message}
+}
+initChart();loadData();
+</script></body></html>
