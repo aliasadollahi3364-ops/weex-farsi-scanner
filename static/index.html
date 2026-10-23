@@ -1,119 +1,1036 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>اسکنر فارسی WEEX</title>
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-<style>
-:root{--bg:#0b1220;--panel:#121d30;--line:#24334b;--txt:#e8eef8;--muted:#91a2bc;--green:#35d39a;--red:#ff6878;--blue:#6fa8ff}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font-family:Tahoma,Arial,sans-serif}
-header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-h1{font-size:20px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:7px}
-main{max-width:1400px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
-.card,.box{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px}.label{font-size:12px;color:var(--muted)}.value{font-size:20px;font-weight:bold;margin-top:9px}
-.controls{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:14px}
-label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:12px}
-input,select,button{background:#0d1728;color:var(--txt);border:1px solid #30425e;border-radius:8px;padding:10px;font:inherit}
-button{cursor:pointer;background:#1d4f91;border-color:#2f6db7}button:hover{filter:brightness(1.15)}
-.layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:14px}
-#chart{height:440px;width:100%}.pill{display:inline-block;padding:5px 9px;border-radius:20px;background:#183b35;color:var(--green);font-size:12px}
-.row{padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}.row:last-child{border:0}
-.checks{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.checks label{flex-direction:row;align-items:center;color:var(--txt)}
-.muted{color:var(--muted);font-size:12px;line-height:1.8}.notice{color:#ffcf70;background:#3a2e18;padding:10px;border-radius:8px;font-size:12px;line-height:1.8;margin-top:12px}
-@media(max-width:800px){.grid{grid-template-columns:1fr 1fr}.layout{grid-template-columns:1fr}#chart{height:350px}main{padding:12px}}
-</style></head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>اسکنر فارسی WEEX</title>
+
+  <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+
+  <style>
+    :root {
+      --bg: #0a101c;
+      --panel: #121d30;
+      --border: #263750;
+      --text: #eaf1fb;
+      --muted: #94a7c1;
+      --green: #35d39a;
+      --red: #ff6878;
+      --blue: #60a5fa;
+      --yellow: #f5c451;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    .container {
+      max-width: 1450px;
+      margin: auto;
+      padding: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 23px;
+      margin: 0 0 7px;
+    }
+
+    .subtitle, .muted {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 12px;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--yellow);
+    }
+
+    .dot.ok { background: var(--green); }
+    .dot.error { background: var(--red); }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 14px;
+      min-width: 0;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    label {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 7px;
+      font-size: 12px;
+    }
+
+    input, select, button {
+      width: 100%;
+      border: 1px solid #354762;
+      background: #0c1626;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 11px;
+      font: inherit;
+      min-height: 42px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #2563eb;
+      border-color: #2563eb;
+      font-weight: bold;
+    }
+
+    button:hover { filter: brightness(1.12); }
+    button.secondary {
+      background: #22334c;
+      border-color: #354762;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: wait;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 13px;
+      min-width: 0;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+    }
+
+    .green { color: var(--green); }
+    .red { color: var(--red); }
+    .yellow { color: var(--yellow); }
+    .blue { color: var(--blue); }
+
+    .chart-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .chart-heading h2, .panel h2 {
+      font-size: 16px;
+      margin: 0;
+    }
+
+    #chart {
+      width: 100%;
+      height: 460px;
+      direction: ltr;
+      position: relative;
+    }
+
+    .notice {
+      padding: 12px;
+      border-radius: 8px;
+      background: #0c1626;
+      border: 1px solid var(--border);
+      line-height: 1.9;
+      overflow-wrap: anywhere;
+    }
+
+    .signals {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .signal {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 12px;
+      line-height: 1.9;
+      min-width: 0;
+    }
+
+    .signal-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .switches {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .switch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0c1626;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--text);
+      margin: 0;
+    }
+
+    .switch input {
+      width: auto;
+      min-height: 0;
+      accent-color: var(--green);
+    }
+
+    .telegram-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .telegram-row button { min-width: 150px; }
+
+    footer {
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      padding: 12px 0;
+      line-height: 1.9;
+    }
+
+    @media (max-width: 760px) {
+      .container { padding: 10px; }
+      h1 { font-size: 19px; }
+      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #chart { height: 360px; }
+      .signals { grid-template-columns: 1fr; }
+      .telegram-row { grid-template-columns: 1fr; }
+      .telegram-row button { min-width: 0; }
+    }
+
+    @media (max-width: 380px) {
+      .controls { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
 <body>
-<header><div><h1>📡 اسکنر حرفه‌ای WEEX</h1><div class="sub">پنل فارسی · بازار فیوچرز USDT · تحلیل تکنیکال و هشدار تلگرام</div></div><span id="status" class="pill">آماده اتصال</span></header>
-<main>
-<div class="grid">
- <div class="card"><div class="label">نماد</div><div class="value" id="symCard">BTCUSDT</div></div>
- <div class="card"><div class="label">آخرین قیمت کندل</div><div class="value" id="price">—</div></div>
- <div class="card"><div class="label">تایم‌فریم</div><div class="value" id="tfCard">۱۵ دقیقه</div></div>
- <div class="card"><div class="label">وضعیت تحلیل</div><div class="value" id="signal">در انتظار داده</div></div>
+<div class="container">
+  <header>
+    <div>
+      <h1>اسکنر تکنیکال WEEX</h1>
+      <div class="subtitle">نمودار کندلی، الگوهای مثلث، شکست و بررسی شکست فیک</div>
+    </div>
+    <div class="status">
+      <span id="statusDot" class="dot"></span>
+      <span id="statusText">در حال آماده‌سازی</span>
+    </div>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <div>
+        <label for="symbol">نماد معاملاتی</label>
+        <input id="symbol" value="BTCUSDT" placeholder="BTCUSDT" autocomplete="off">
+      </div>
+
+      <div>
+        <label for="interval">تایم‌فریم</label>
+        <select id="interval">
+          <option value="1m">۱ دقیقه</option>
+          <option value="5m">۵ دقیقه</option>
+          <option value="15m" selected>۱۵ دقیقه</option>
+          <option value="30m">۳۰ دقیقه</option>
+          <option value="1h">۱ ساعت</option>
+          <option value="4h">۴ ساعت</option>
+          <option value="12h">۱۲ ساعت</option>
+          <option value="1d">روزانه</option>
+          <option value="1w">هفتگی</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="limit">تعداد کندل</label>
+        <select id="limit">
+          <option value="100">۱۰۰ کندل</option>
+          <option value="200" selected>۲۰۰ کندل</option>
+          <option value="300">۳۰۰ کندل</option>
+          <option value="500">۵۰۰ کندل</option>
+        </select>
+      </div>
+
+      <div>
+        <label>&nbsp;</label>
+        <button id="loadBtn" onclick="loadMarket()">دریافت نمودار و اسکن</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="stats">
+    <div class="stat">
+      <div class="stat-label">آخرین قیمت</div>
+      <div id="price" class="stat-value">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">تغییر ۲۴ ساعته</div>
+      <div id="change" class="stat-value">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">وضعیت بازار</div>
+      <div id="marketState" class="stat-value">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">الگوی شناسایی‌شده</div>
+      <div id="patternState" class="stat-value">در انتظار اسکن</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="chart-heading">
+      <h2 id="chartTitle">نمودار قیمت</h2>
+      <span class="muted">خطوط الگو روی نمودار رسم می‌شوند</span>
+    </div>
+    <div id="chart"></div>
+    <div id="chartMessage" class="muted" style="margin-top:10px">
+      برای دریافت اطلاعات روی «دریافت نمودار و اسکن» کلیک کنید.
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>تنظیمات اسکنر</h2>
+    <div class="switches">
+      <label class="switch">
+        <input id="scanTriangle" type="checkbox" checked>
+        تشخیص مثلث صعودی، نزولی و متقارن
+      </label>
+      <label class="switch">
+        <input id="scanBreakout" type="checkbox" checked>
+        تشخیص شکست سطح
+      </label>
+      <label class="switch">
+        <input id="scanRetest" type="checkbox" checked>
+        بررسی پولبک پس از شکست
+      </label>
+      <label class="switch">
+        <input id="scanFake" type="checkbox" checked>
+        بررسی احتمال شکست فیک
+      </label>
+      <label class="switch">
+        <input id="scanVolume" type="checkbox">
+        بررسی افزایش حجم
+      </label>
+      <label class="switch">
+        <input id="showLines" type="checkbox" checked>
+        نمایش خطوط روی نمودار
+      </label>
+    </div>
+    <div style="margin-top:12px">
+      <button class="secondary" onclick="loadMarket()">اجرای مجدد اسکن با تنظیمات جدید</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>نتیجه تحلیل</h2>
+    <div id="summary" class="notice" style="margin-top:12px">
+      هنوز اسکن انجام نشده است.
+    </div>
+    <div id="signals" class="signals"></div>
+  </section>
+
+  <section class="panel">
+    <h2>آزمایش اتصال تلگرام</h2>
+    <p class="muted">ابتدا متغیرهای TELEGRAM_BOT_TOKEN و TELEGRAM_CHAT_ID را در تنظیمات Render وارد کن.</p>
+    <div class="telegram-row">
+      <div>
+        <label for="telegramMessage">متن پیام آزمایشی</label>
+        <input id="telegramMessage" value="آزمایش اتصال ربات اسکنر WEEX">
+      </div>
+      <button id="telegramBtn" onclick="testTelegram()">ارسال پیام آزمایشی</button>
+    </div>
+    <div id="telegramResult" class="notice" style="margin-top:12px;display:none"></div>
+  </section>
+
+  <footer>
+    این اسکنر ابزار کمکی تحلیل تکنیکال است. سیگنال‌ها قطعی نیستند و این نسخه سفارش خرید یا فروش ثبت نمی‌کند.
+    نتیجه شکست و پولبک بر اساس کندل‌های دریافتی و قواعد ساده محاسبه می‌شود.
+  </footer>
 </div>
-<div class="box controls">
-<label>نماد فیوچرز USDT<input id="symbol" value="BTCUSDT" maxlength="24"></label>
-<label>تایم‌فریم<select id="interval"><option value="5m">۵ دقیقه</option><option value="15m" selected>۱۵ دقیقه</option><option value="30m">۳۰ دقیقه</option><option value="1h">۱ ساعت</option><option value="4h">۴ ساعت</option><option value="1d">روزانه</option></select></label>
-<label>تعداد کندل<select id="limit"><option>100</option><option selected>200</option><option>500</option></select></label>
-<button onclick="loadData()">دریافت نمودار</button><button onclick="analyze()">تحلیل الگوها</button>
-</div>
-<div class="layout">
- <section class="box"><h3>📈 نمودار کندل و خطوط تحلیل</h3><div id="chart"></div><div class="muted">خطوط روند و نواحی الگو بر اساس نقاط چرخش قیمت تخمینی رسم می‌شوند؛ برای تأیید، منتظر بسته‌شدن کندل بمانید.</div></section>
- <aside class="box"><h3>🧭 تنظیمات اسکنر</h3>
- <div class="checks">
-  <label><input type="checkbox" id="triUp" checked> مثلث صعودی</label>
-  <label><input type="checkbox" id="triDown" checked> مثلث نزولی</label>
-  <label><input type="checkbox" id="triSym" checked> مثلث متقارن</label>
-  <label><input type="checkbox" id="trend" checked> خط روند</label>
-  <label><input type="checkbox" id="breakout" checked> شکست و پولبک</label>
-  <label><input type="checkbox" id="fake" checked> بررسی شکست فیک</label>
-  <label><input type="checkbox" id="volume"> فیلتر حجم</label>
- </div>
- <h3>🔎 نتیجه تحلیل</h3><div id="results"><div class="row">برای شروع روی «تحلیل الگوها» بزنید.</div></div>
- <h3>🔔 تلگرام</h3><button onclick="telegramTest()">آزمایش ارسال پیام</button><div id="tgResult" class="muted"></div>
- <div class="notice">این نسخه فقط تحلیل و نمایش داده انجام می‌دهد؛ معامله خودکار ندارد. پیش از استفاده واقعی، API و منطق الگوها باید روی داده‌های WEEX آزمون شوند.</div>
- </aside>
-</div>
-</main>
+
 <script>
-let chart, candleSeries, candles=[];
-function initChart(){
- const el=document.getElementById('chart');
- chart=LightweightCharts.createChart(el,{layout:{background:{color:'#121d30'},textColor:'#c8d5e8'},grid:{vertLines:{color:'#1d2b40'},horzLines:{color:'#1d2b40'}},rightPriceScale:{borderColor:'#30425e'},timeScale:{borderColor:'#30425e',timeVisible:true},crosshair:{mode:1}});
- candleSeries=chart.addCandlestickSeries({upColor:'#35d39a',downColor:'#ff6878',borderUpColor:'#35d39a',borderDownColor:'#ff6878',wickUpColor:'#35d39a',wickDownColor:'#ff6878'});
- new ResizeObserver(()=>chart.applyOptions({width:el.clientWidth})).observe(el);
+"use strict";
+
+let chart = null;
+let candleSeries = null;
+let overlaySeries = [];
+let candleData = [];
+let resizeObserver = null;
+let busy = false;
+
+const $ = id => document.getElementById(id);
+
+function setStatus(message, type = "") {
+  $("statusText").textContent = message;
+  $("statusDot").className = "dot" + (type ? " " + type : "");
 }
-function fa(n){return Number(n).toLocaleString('fa-IR',{maximumFractionDigits:8})}
-async function loadData(){
- const symbol=document.getElementById('symbol').value.trim().toUpperCase(), interval=document.getElementById('interval').value, limit=document.getElementById('limit').value;
- document.getElementById('status').textContent='در حال دریافت داده…';
- try{
-  const r=await fetch(`/api/klines?symbol=${encodeURIComponent(symbol)}&interval=${interval}&limit=${limit}`), d=await r.json();
-  if(d.error) throw Error(d.error);
-  candles=d.candles;candleSeries.setData(candles);chart.timeScale().fitContent();
-  document.getElementById('symCard').textContent=symbol;document.getElementById('tfCard').textContent=interval;
-  document.getElementById('price').textContent=fa(candles.at(-1).close);document.getElementById('status').textContent='داده دریافت شد';
-  analyze();
- }catch(e){document.getElementById('status').textContent='خطا در اتصال';document.getElementById('results').innerHTML=`<div class="row">${e.message}</div>`}
+
+function fmt(value) {
+  if (!Number.isFinite(Number(value))) return "—";
+  return Number(value).toLocaleString("en-US", {
+    maximumFractionDigits: 8
+  });
 }
-function pivots(field, high=true){
- const out=[];for(let i=2;i<candles.length-2;i++){let v=candles[i][field],ok=true;for(let j=i-2;j<=i+2;j++){if(i!==j&&((high&&candles[j][field]>=v)||(!high&&candles[j][field]<=v))){ok=false;break}}if(ok)out.push({time:candles[i].time,value:v,index:i})}return out.slice(-5)
+
+function signedPct(value) {
+  if (!Number.isFinite(value)) return "—";
+  return (value > 0 ? "+" : "") + value.toFixed(2) + "%";
 }
-function lineBetween(a,b,color,title){
- if(!a||!b||a.time===b.time)return;
- const vals=candles.filter(c=>c.time>=a.time&&c.time<=b.time).map(c=>({time:c.time,value:a.value+(b.value-a.value)*(c.time-a.time)/(b.time-a.time)}));
- if(vals.length>1){const s=chart.addLineSeries({color,lineWidth:2,title,priceLineVisible:false,lastValueVisible:false});s.setData(vals)}
+
+function initChart() {
+  const el = $("chart");
+
+  if (typeof LightweightCharts === "undefined") {
+    throw new Error("کتابخانه نمودار بارگذاری نشده است. اتصال اینترنت یا CDN را بررسی کنید.");
+  }
+
+  if (chart) {
+    try { chart.remove(); } catch (_) {}
+    chart = null;
+    candleSeries = null;
+    overlaySeries = [];
+  }
+
+  chart = LightweightCharts.createChart(el, {
+    width: Math.max(el.clientWidth, 300),
+    height: window.innerWidth < 760 ? 360 : 460,
+    layout: {
+      background: { color: "#121d30" },
+      textColor: "#c8d5e8"
+    },
+    grid: {
+      vertLines: { color: "#1d2b40" },
+      horzLines: { color: "#1d2b40" }
+    },
+    rightPriceScale: {
+      borderColor: "#30425e"
+    },
+    timeScale: {
+      borderColor: "#30425e",
+      timeVisible: true,
+      secondsVisible: false
+    },
+    crosshair: { mode: 1 },
+    localization: {
+      priceFormatter: price => fmt(price)
+    }
+  });
+
+  candleSeries = chart.addCandlestickSeries({
+    upColor: "#35d39a",
+    downColor: "#ff6878",
+    borderUpColor: "#35d39a",
+    borderDownColor: "#ff6878",
+    wickUpColor: "#35d39a",
+    wickDownColor: "#ff6878",
+    priceLineVisible: true
+  });
+
+  if (resizeObserver) resizeObserver.disconnect();
+
+  resizeObserver = new ResizeObserver(() => {
+    if (!chart) return;
+    chart.applyOptions({
+      width: Math.max(el.clientWidth, 300)
+    });
+  });
+
+  resizeObserver.observe(el);
 }
-function analyze(){
- if(candles.length<30)return;
- chart.removeSeries; // خطوط قبلی با بازسازی نمودار در بارگذاری بعدی پاک می‌شوند؛ در تحلیل مجدد فقط نتیجه متنی تازه می‌شود.
- const highs=pivots('high',true), lows=pivots('low',false), last=candles.at(-1), prev=candles.at(-2), findings=[];
- const enabled=id=>document.getElementById(id).checked;
- if(enabled('trend')&&highs.length>=2&&lows.length>=2){lineBetween(highs.at(-2),highs.at(-1),'#ffb454','روند سقف‌ها');lineBetween(lows.at(-2),lows.at(-1),'#6fa8ff','روند کف‌ها');findings.push('خطوط روند بر پایه دو سقف و دو کف اخیر رسم شد.')}
- if(highs.length>=2&&lows.length>=2){
-  const h1=highs.at(-2),h2=highs.at(-1),l1=lows.at(-2),l2=lows.at(-1);
-  const flatHigh=Math.abs(h2.value-h1.value)/h1.value<0.012, flatLow=Math.abs(l2.value-l1.value)/l1.value<0.012;
-  const risingLow=l2.value>l1.value, fallingHigh=h2.value<h1.value;
-  if(enabled('triUp')&&flatHigh&&risingLow)findings.push('احتمال مثلث صعودی؛ نیازمند تأیید شکست مقاومت.');
-  if(enabled('triDown')&&flatLow&&fallingHigh)findings.push('احتمال مثلث نزولی؛ نیازمند تأیید شکست حمایت.');
-  if(enabled('triSym')&&risingLow&&fallingHigh)findings.push('احتمال مثلث متقارن؛ منتظر شکست معتبر بمانید.');
- }
- let breakoutText='شکست تأییدشده‌ای تشخیص داده نشد.';
- if(enabled('breakout')&&highs.length&&lows.length){
-  const resistance=highs.at(-1).value,support=lows.at(-1).value;
-  if(last.close>resistance&&prev.close<=resistance)breakoutText='شکست صعودی سطح اخیر دیده شد؛ پولبک هنوز باید جداگانه تأیید شود.';
-  else if(last.close<support&&prev.close>=support)breakoutText='شکست نزولی سطح اخیر دیده شد؛ پولبک هنوز باید جداگانه تأیید شود.';
- }
- findings.push(breakoutText);
- if(enabled('fake'))findings.push('فیلتر شکست فیک: این نسخه بررسی اولیه دارد؛ تشخیص قطعی ممکن نیست.');
- if(enabled('volume')){const avg=candles.slice(-21,-1).reduce((s,c)=>s+c.volume,0)/20;findings.push(last.volume>avg?'حجم کندل آخر بالاتر از میانگین ۲۰ کندل است.':'حجم کندل آخر از میانگین ۲۰ کندل بالاتر نیست.')}
- document.getElementById('signal').textContent=last.close>last.open?'کندل آخر صعودی':last.close<last.open?'کندل آخر نزولی':'کندل خنثی';
- document.getElementById('results').innerHTML=findings.map(x=>`<div class="row">• ${x}</div>`).join('');
+
+function clearOverlayLines() {
+  if (!chart) return;
+
+  for (const series of overlaySeries) {
+    try { chart.removeSeries(series); } catch (_) {}
+  }
+
+  overlaySeries = [];
 }
-async function telegramTest(){
- const out=document.getElementById('tgResult');out.textContent='در حال آزمایش…';
- try{const r=await fetch('/api/telegram-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:'🔔 آزمایش ربات اسکنر فارسی WEEX'})});const d=await r.json();out.textContent=d.message}
- catch(e){out.textContent='خطا: '+e.message}
+
+function drawLine(points, color, title, style) {
+  if (!chart || !candleSeries || !points || points.length < 2) return;
+
+  const line = chart.addLineSeries({
+    color,
+    lineWidth: 2,
+    lineStyle: style || 0,
+    title,
+    lastValueVisible: false,
+    priceLineVisible: false,
+    crosshairMarkerVisible: false
+  });
+
+  line.setData(points);
+  overlaySeries.push(line);
 }
-initChart();loadData();
-</script></body></html>
+
+function linePoints(candles, startIndex, endIndex, startPrice, endPrice) {
+  const startTime = candles[startIndex].time;
+  const endTime = candles[endIndex].time;
+
+  if (startIndex === endIndex) {
+    return [
+      { time: startTime, value: startPrice },
+      { time: startTime + 60, value: endPrice }
+    ];
+  }
+
+  return [
+    { time: startTime, value: startPrice },
+    { time: endTime, value: endPrice }
+  ];
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  const text = await response.text();
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (_) {
+    throw new Error("پاسخ سرور JSON معتبر نیست. وضعیت سرویس Render را بررسی کنید.");
+  }
+
+  if (!response.ok) {
+    throw new Error("خطای سرور: " + response.status);
+  }
+
+  if (data && data.error) {
+    throw new Error(data.error + (data.detail ? " | " + data.detail : ""));
+  }
+
+  return data;
+}
+
+async function loadMarket() {
+  if (busy) return;
+
+  const symbol = $("symbol").value.trim().toUpperCase();
+  const interval = $("interval").value;
+  const limit = $("limit").value;
+
+  if (!/^[A-Z0-9_]{3,30}$/.test(symbol)) {
+    setStatus("نماد نامعتبر است", "error");
+    $("chartMessage").textContent = "نمادی مانند BTCUSDT وارد کنید.";
+    return;
+  }
+
+  busy = true;
+  $("loadBtn").disabled = true;
+  setStatus("در حال دریافت اطلاعات");
+
+  $("chartMessage").textContent = "در حال دریافت کندل‌ها از WEEX...";
+  $("summary").textContent = "در حال تحلیل بازار...";
+  $("signals").innerHTML = "";
+
+  try {
+    const url = "/api/klines?symbol=" + encodeURIComponent(symbol)
+      + "&interval=" + encodeURIComponent(interval)
+      + "&limit=" + encodeURIComponent(limit);
+
+    const data = await fetchJson(url);
+
+    if (!Array.isArray(data.candles) || data.candles.length < 10) {
+      throw new Error("تعداد کندل‌های دریافتی کافی نیست.");
+    }
+
+    candleData = data.candles.map(c => ({
+      time: Number(c.time),
+      open: Number(c.open),
+      high: Number(c.high),
+      low: Number(c.low),
+      close: Number(c.close),
+      volume: Number(c.volume || 0)
+    })).filter(c =>
+      Number.isFinite(c.time) &&
+      Number.isFinite(c.open) &&
+      Number.isFinite(c.high) &&
+      Number.isFinite(c.low) &&
+      Number.isFinite(c.close)
+    ).sort((a, b) => a.time - b.time);
+
+    const unique = new Map();
+    candleData.forEach(c => unique.set(c.time, c));
+    candleData = Array.from(unique.values()).sort((a, b) => a.time - b.time);
+
+    if (candleData.length < 10) {
+      throw new Error("کندل‌های معتبر کافی دریافت نشدند.");
+    }
+
+    initChart();
+    candleSeries.setData(candleData);
+    chart.timeScale().fitContent();
+
+    $("chartTitle").textContent = symbol + " — " + interval;
+    $("chartMessage").textContent =
+      candleData.length + " کندل دریافت شد. زمان آخرین کندل: " +
+      new Date(candleData[candleData.length - 1].time * 1000).toLocaleString();
+
+    await loadTicker(symbol);
+    runAnalysis();
+
+    setStatus("اتصال موفق", "ok");
+  } catch (error) {
+    console.error(error);
+    setStatus("خطا در دریافت اطلاعات", "error");
+    $("chartMessage").textContent = error.message || "خطای ناشناخته";
+    $("summary").textContent = error.message || "دریافت اطلاعات ناموفق بود.";
+  } finally {
+    busy = false;
+    $("loadBtn").disabled = false;
+  }
+}
+
+async function loadTicker(symbol) {
+  try {
+    const data = await fetchJson(
+      "/api/ticker?symbol=" + encodeURIComponent(symbol)
+    );
+
+    const price = Number(data.lastPrice ?? data.last ?? data.price);
+    const change = Number(data.priceChangePercent ?? data.changePercent);
+
+    $("price").textContent = Number.isFinite(price) ? fmt(price) : fmt(candleData[candleData.length - 1].close);
+    $("change").textContent = Number.isFinite(change) ? signedPct(change) : "—";
+    $("change").className = "stat-value " +
+      (change > 0 ? "green" : change < 0 ? "red" : "");
+
+  } catch (error) {
+    console.warn("Ticker unavailable:", error);
+    $("price").textContent = fmt(candleData[candleData.length - 1].close);
+    $("change").textContent = "—";
+  }
+}
+
+function getPivots(candles, type, radius = 3) {
+  const result = [];
+
+  for (let i = radius; i < candles.length - radius; i++) {
+    const price = type === "high" ? candles[i].high : candles[i].low;
+    let valid = true;
+
+    for (let j = i - radius; j <= i + radius; j++) {
+      if (j === i) continue;
+
+      if (type === "high" && candles[j].high >= price) {
+        valid = false;
+        break;
+      }
+
+      if (type === "low" && candles[j].low <= price) {
+        valid = false;
+        break;
+      }
+    }
+
+    if (valid) result.push({ index: i, price, time: candles[i].time });
+  }
+
+  return result;
+}
+
+function slope(a, b) {
+  const dx = b.index - a.index;
+  return dx === 0 ? 0 : (b.price - a.price) / dx;
+}
+
+function projectedPrice(a, b, index) {
+  return a.price + slope(a, b) * (index - a.index);
+}
+
+function near(a, b, percent = 0.25) {
+  const base = Math.max(Math.abs(a), Math.abs(b), 1e-10);
+  return Math.abs(a - b) / base * 100 <= percent;
+}
+
+function analyzeTriangle(candles) {
+  const highs = getPivots(candles, "high").slice(-6);
+  const lows = getPivots(candles, "low").slice(-6);
+
+  if (highs.length < 2 || lows.length < 2) {
+    return { name: "الگوی مشخصی پیدا نشد", kind: "none" };
+  }
+
+  const h1 = highs[highs.length - 2];
+  const h2 = highs[highs.length - 1];
+  const l1 = lows[lows.length - 2];
+  const l2 = lows[lows.length - 1];
+
+  const highSlope = slope(h1, h2);
+  const lowSlope = slope(l1, l2);
+  const lastIndex = candles.length - 1;
+
+  const projectedHigh = projectedPrice(h1, h2, lastIndex);
+  const projectedLow = projectedPrice(l1, l2, lastIndex);
+
+  const current = candles[lastIndex].close;
+  const range = candles.slice(-20);
+  const maxHigh = Math.max(...range.map(c => c.high));
+  const minLow = Math.min(...range.map(c => c.low));
+  const width = Math.max(maxHigh - minLow, 1e-10);
+  const converging = projectedHigh > projectedLow &&
+    projectedHigh - projectedLow < width * 1.25;
+
+  let result = { name: "الگوی مشخصی پیدا نشد", kind: "none" };
+
+  if (converging && near(h1.price, h2.price, 0.4) && lowSlope > 0) {
+    result = {
+      name: "مثلث صعودی",
+      kind: "ascending",
+      upper: [h1, h2],
+      lower: [l1, l2],
+      breakout: projectedHigh,
+      support: projectedLow
+    };
+  } else if (converging && near(l1.price, l2.price, 0.4) && highSlope < 0) {
+    result = {
+      name: "مثلث نزولی",
+      kind: "descending",
+      upper: [h1, h2],
+      lower: [l1, l2],
+      breakout: projectedLow,
+      resistance: projectedHigh
+    };
+  } else if (converging && highSlope < 0 && lowSlope > 0) {
+    result = {
+      name: "مثلث متقارن",
+      kind: "symmetrical",
+      upper: [h1, h2],
+      lower: [l1, l2],
+      breakout: current > (projectedHigh + projectedLow) / 2
+        ? projectedHigh : projectedLow
+    };
+  }
+
+  return result;
+}
+
+function averageVolume(candles, endIndex, count = 20) {
+  const start = Math.max(0, endIndex - count);
+  const values = candles.slice(start, endIndex).map(c => c.volume).filter(v => v > 0);
+
+  if (!values.length) return 0;
+  return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function makeSignal(title, body, color = "") {
+  return '<div class="signal"><div class="signal-title ' + color + '">' +
+    escapeHtml(title) + '</div><div>' + escapeHtml(body) + '</div></div>';
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&#39;"
+  })[ch]);
+}
+
+function runAnalysis() {
+  if (!candleData.length) return;
+
+  clearOverlayLines();
+
+  const candles = candleData;
+  const lastIndex = candles.length - 1;
+  const last = candles[lastIndex];
+  const previous = candles[lastIndex - 1];
+  const triangle = $("scanTriangle").checked
+    ? analyzeTriangle(candles)
+    : { name: "تشخیص الگو غیرفعال است", kind: "none" };
+
+  const signals = [];
+  let state = "خنثی";
+  let stateClass = "yellow";
+  let patternText = triangle.name;
+  let upperLevel = null;
+  let lowerLevel = null;
+
+  if (triangle.kind !== "none") {
+    upperLevel = triangle.upper[1].price;
+    lowerLevel = triangle.lower[1].price;
+
+    if ($("showLines").checked) {
+      drawLine(
+        linePoints(candles, triangle.upper[0].index, triangle.upper[1].index,
+          triangle.upper[0].price, triangle.upper[1].price),
+        "#f5c451", "خط مقاومت مثلث"
+      );
+
+      drawLine(
+        linePoints(candles, triangle.lower[0].index, triangle.lower[1].index,
+          triangle.lower[0].price, triangle.lower[1].price),
+        "#60a5fa", "خط حمایت مثلث"
+      );
+    }
+
+    signals.push(makeSignal(
+      "الگو شناسایی شد",
+      triangle.name + "؛ الگو بر اساس نقاط سقف و کف محلی تخمین زده شده است.",
+      "blue"
+    ));
+  } else {
+    signals.push(makeSignal(
+      "الگوی مثلث",
+      $("scanTriangle").checked
+        ? "در داده‌های فعلی مثلث قابل‌تشخیص پیدا نشد."
+        : "تشخیص الگو در تنظیمات خاموش است."
+    ));
+  }
+
+  const recent = candles.slice(-20);
+  const resistance = Math.max(...recent.slice(0, -1).map(c => c.high));
+  const support = Math.min(...recent.slice(0, -1).map(c => c.low));
+  const tolerance = Math.max(last.close * 0.0015, 1e-10);
+
+  if ($("scanBreakout").checked) {
+    if (last.close > resistance && previous.close <= resistance) {
+      state = "شکست صعودی";
+      stateClass = "green";
+      signals.push(makeSignal(
+        "شکست صعودی احتمالی",
+        "بسته‌شدن آخرین کندل بالاتر از سقف محدوده اخیر: " + fmt(resistance),
+        "green"
+      ));
+    } else if (last.close < support && previous.close >= support) {
+      state = "شکست نزولی";
+      stateClass = "red";
+      signals.push(makeSignal(
+        "شکست نزولی احتمالی",
+        "بسته‌شدن آخرین کندل پایین‌تر از کف محدوده اخیر: " + fmt(support),
+        "red"
+      ));
+    } else {
+      signals.push(makeSignal(
+        "شکست سطح",
+        "در آخرین کندل شکست تازه‌ای نسبت به محدوده ۱۹ کندل قبلی دیده نشد."
+      ));
+    }
+  }
+
+  if ($("scanRetest").checked) {
+    const lookback = candles.slice(-6, -1);
+    const recentTouchResistance = lookback.some(c =>
+      Math.abs(c.low - resistance) <= tolerance ||
+      Math.abs(c.close - resistance) <= tolerance
+    );
+    const recentTouchSupport = lookback.some(c =>
+      Math.abs(c.high - support) <= tolerance ||
+      Math.abs(c.close - support) <= tolerance
+    );
+
+    if (last.close > resistance && recentTouchResistance) {
+      signals.push(makeSignal(
+        "بررسی پولبک صعودی",
+        "قیمت بالاتر از مقاومت اخیر بسته شده و در کندل‌های نزدیک تماس با سطح دیده می‌شود؛ پولبک تأییدشده نیست.",
+        "green"
+      ));
+    } else if (last.close < support && recentTouchSupport) {
+      signals.push(makeSignal(
+        "بررسی پولبک نزولی",
+        "قیمت پایین‌تر از حمایت اخیر بسته شده و در کندل‌های نزدیک تماس با سطح دیده می‌شود؛ پولبک تأییدشده نیست.",
+        "red"
+      ));
+    } else {
+      signals.push(makeSignal(
+        "پولبک",
+        "شرایط ساده بررسی پولبک در داده‌های اخیر کامل نشده است."
+      ));
+    }
+  }
+
+  if ($("scanFake").checked) {
+    const recentHigh = Math.max(...candles.slice(-6, -1).map(c => c.high));
+    const recentLow = Math.min(...candles.slice(-6, -1).map(c => c.low));
+
+    if (last.high > recentHigh && last.close < recentHigh) {
+      signals.push(makeSignal(
+        "هشدار احتمال شکست فیک صعودی",
+        "سقف محدوده لمس یا رد شده، اما کندل زیر سطح بسته شده است. این هشدار قطعی نیست.",
+        "yellow"
+      ));
+    } else if (last.low < recentLow && last.close > recentLow) {
+      signals.push(makeSignal(
+        "هشدار احتمال شکست فیک نزولی",
+        "کف محدوده شکسته شده، اما کندل بالای سطح بسته شده است. این هشدار قطعی نیست.",
+        "yellow"
+      ));
+    } else {
+      signals.push(makeSignal(
+        "شکست فیک",
+        "در آخرین کندل نشانه ساده‌ای از برگشت به داخل محدوده پیدا نشد."
+      ));
+    }
+  }
+
+  if ($("scanVolume").checked) {
+    const avg = averageVolume(candles, lastIndex, 20);
+
+    if (avg > 0 && last.volume > avg * 1.5) {
+      signals.push(makeSignal(
+        "افزایش حجم",
+        "حجم آخرین کندل بیشتر از ۱٫۵ برابر میانگین حجم کندل‌های قبلی است.",
+        "blue"
+      ));
+    } else {
+      signals.push(makeSignal(
+        "بررسی حجم",
+        "افزایش حجم معنادار بر اساس این آستانه ساده دیده نشد."
+      ));
+    }
+  }
+
+  if (state === "خنثی" && triangle.kind !== "none") {
+    if (last.close > upperLevel) {
+      state = "بالای خط بالایی الگو";
+      stateClass = "green";
+    } else if (last.close < lowerLevel) {
+      state = "پایین خط پایینی الگو";
+      stateClass = "red";
+    }
+  }
+
+  $("marketState").textContent = state;
+  $("marketState").className = "stat-value " + stateClass;
+  $("patternState").textContent = patternText;
+
+  const candleDirection = last.close > last.open
+    ? "صعودی"
+    : last.close < last.open ? "نزولی" : "بدون تغییر";
+
+  $("summary").textContent =
+    "نماد: " + $("symbol").value.trim().toUpperCase() +
+    " | آخرین کندل: " + candleDirection +
+    " | قیمت بسته‌شدن: " + fmt(last.close) +
+    " | تعداد کندل‌های بررسی‌شده: " + candles.length +
+    ". این نتایج تخمینی هستند و برای تأیید سیگنال به بررسی بیشتر نیاز دارند.";
+
+  $("signals").innerHTML = signals.join("");
+}
+
+async function testTelegram() {
+  const btn = $("telegramBtn");
+  const result = $("telegramResult");
+
+  btn.disabled = true;
+  result.style.display = "block";
+  result.textContent = "در حال آزمایش اتصال تلگرام...";
+
+  try {
+    const response = await fetch("/api/telegram-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: $("telegramMessage").value.trim() ||
+          "آزمایش اتصال اسکنر فارسی WEEX"
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.ok) {
+      result.textContent = "پاسخ سرور: " + (data.message || "درخواست موفق بود");
+    } else {
+      result.textContent = "ارسال انجام نشد: " +
+        (data.message || data.detail || "خطای نامشخص");
+    }
+  } catch (error) {
+    result.textContent = "خطا در اتصال به سرور: " + error.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+[
+  "scanTriangle", "scanBreakout", "scanRetest",
+  "scanFake", "scanVolume", "showLines"
+].forEach(id => {
+  $(id).addEventListener("change", () => {
+    if (candleData.length) runAnalysis();
+  });
+});
+
+window.addEventListener("load", () => {
+  if (typeof LightweightCharts === "undefined") {
+    setStatus("کتابخانه نمودار بارگذاری نشد", "error");
+    $("chartMessage").textContent =
+      "کتابخانه نمودار از CDN دریافت نشد. اینترنت یا دسترسی به unpkg.com را بررسی کنید.";
+    return;
+  }
+
+  try {
+    initChart();
+    setStatus("آماده دریافت اطلاعات", "ok");
+  } catch (error) {
+    console.error(error);
+    setStatus("خطا در راه‌اندازی نمودار", "error");
+    $("chartMessage").textContent = error.message;
+  }
+});
+</script>
+</body>
+</html>
