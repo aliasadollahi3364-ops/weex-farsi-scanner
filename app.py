@@ -1,317 +1,723 @@
 import os
-import json
-from pathlib import Path
+import time
+import asyncio
+import logging
+from datetime import datetime, timezone
 
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pathlib import Path
 
-BASE = Path(__file__).parent
-STATIC_DIR = BASE / "static"
-CONFIG = BASE / "selected_symbols.json"
+# =========================================================
+# WEEX 4H ORDER BLOCK + 15M CHoCH TELEGRAM SCANNER
+# Signal-only bot. No real orders are submitted.
+# =========================================================
 
-WEEX_BASE_URL = "https://api-contract.weex.com"
+app = FastAPI(title="WEEX Farsi Scanner")
+
+BASE_URL = "https://api-contract.weex.com/capi/v3/market"
+TELEGRAM_URL = "https://api.telegram.org"
 
 DEFAULT_SYMBOLS = [
     "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
     "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "LTCUSDT"
 ]
 
-ALLOWED_INTERVALS = {
-    "1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"
-}
+# Strategy settings from the supplied Pine Script
+HTF_LIMIT = 300
+ENTRY_LIMIT = 600
+PIVOT4 = 3
+PIVOT15 = 3
+BODY_LEN = 10
+OB_SEARCH = 12
+MAX_WAIT = 17
+ATR_LEN = 7
+MAX_BARS_SINCE_TOUCH = 14
+MIN_CHOCH_BODY_ATR = 0.85
+RETEST_ATR = 0.15
+MIN_CONFIRM_BODY_ATR = 0.20
+SL_BUFFER_ATR = 0.15
+RISK_REWARD = 2.0
+BREAK_EVEN_TRIGGER_R = 1.0
+POLL_SECONDS = 60
 
-app = FastAPI(title="اسکنر فارسی WEEX")
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("weex-scanner")
 
-if not STATIC_DIR.is_dir():
-    raise RuntimeError("پوشه static پیدا نشد.")
+selected_symbols = DEFAULT_SYMBOLS.copy()
+last_sent = {}
+latest_signals = {}
+last_prices = {}
+scanner_errors = {}
+scanner_started = False
+telegram_last_test = None
 
-app.mount(
-    "/static",
-    StaticFiles(directory=str(STATIC_DIR)),
-    name="static"
-)
+# ---------------------------------------------------------
+# WEEX market data
+# ---------------------------------------------------------
 
+def get_klines(symbol, interval, limit):
+    response = requests.get(
+        f"{BASE_URL}/klines",
+        params={
+            "symbol": symbol,
+            "interval": interval,
+            "limit": limit,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    payload = response.json()
 
-class Selection(BaseModel):
-    symbols: list[str]
+    if isinstance(payload, dict):
+        rows = payload.get("data", payload.get("result", []))
+    else:
+        rows = payload
 
+    if not isinstance(rows, list):
+        raise RuntimeError(f"Unexpected WEEX kline response: {str(payload)[:200]}")
 
-class TelegramMessage(BaseModel):
-    message: str = "آزمایش اتصال اسکنر فارسی WEEX"
+    candles = []
+    now_ms = int(time.time() * 1000)
 
+    for row in rows:
+        try:
+            # WEEX format:
+            # [open time, open, high, low, close, volume, close time]
+            if isinstance(row, dict):
+                t = int(row.get("time", row.get("openTime", row.get("open_time"))))
+                o = float(row.get("open"))
+                h = float(row.get("high"))
+                low = float(row.get("low"))
+                c = float(row.get("close"))
+                v = float(row.get("volume", 0))
+                ct = int(row.get("closeTime", row.get("close_time", t)))
+            else:
+                t = int(row[0])
+                o = float(row[1])
+                h = float(row[2])
+                low = float(row[3])
+                c = float(row[4])
+                v = float(row[5]) if len(row) > 5 else 0.0
+                ct = int(row[6]) if len(row) > 6 else t
 
-def load_symbols():
-    try:
-        data = json.loads(CONFIG.read_text(encoding="utf-8"))
-        symbols = data.get("symbols", [])
+            # Do not use a candle that has not closed yet.
+            if ct >= now_ms:
+                continue
 
-        if isinstance(symbols, list):
-            cleaned = [
-                s for s in symbols
-                if isinstance(s, str)
-                and s.endswith("USDT")
-            ]
-            return cleaned
-
-    except (OSError, ValueError, TypeError):
-        pass
-
-    return DEFAULT_SYMBOLS.copy()
-
-
-def save_symbols(symbols):
-    cleaned = []
-
-    for symbol in symbols:
-        if not isinstance(symbol, str):
+            candles.append({
+                "time": t,
+                "close_time": ct,
+                "open": o,
+                "high": h,
+                "low": low,
+                "close": c,
+                "volume": v,
+            })
+        except (TypeError, ValueError, IndexError):
             continue
 
-        symbol = (
-            symbol.strip()
-            .upper()
-            .replace("/", "")
-            .replace("-", "")
+    candles.sort(key=lambda x: x["time"])
+
+    # Remove duplicate timestamps.
+    unique = {}
+    for candle in candles:
+        unique[candle["time"]] = candle
+
+    return list(unique.values())
+
+
+def telegram_send(text):
+    token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+    if not token or not chat_id:
+        raise RuntimeError(
+            "TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing in Render."
         )
 
-        if (
-            symbol
-            and symbol.endswith("USDT")
-            and symbol not in cleaned
-        ):
-            cleaned.append(symbol)
+    response = requests.post(
+        f"{TELEGRAM_URL}/bot{token}/sendMessage",
+        json={
+            "chat_id": chat_id,
+            "text": text,
+            "disable_web_page_preview": True,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    data = response.json()
 
-    CONFIG.write_text(
-        json.dumps(
-            {"symbols": cleaned},
-            ensure_ascii=False,
-            indent=2
-        ),
-        encoding="utf-8"
+    if not data.get("ok"):
+        raise RuntimeError(f"Telegram rejected the message: {data}")
+
+
+# ---------------------------------------------------------
+# Indicator helpers
+# ---------------------------------------------------------
+
+def candle_body(c):
+    return abs(c["close"] - c["open"])
+
+
+def is_pivot_high(candles, index, left, right):
+    if index - left < 0 or index + right >= len(candles):
+        return False
+
+    value = candles[index]["high"]
+
+    return (
+        all(value > candles[j]["high"] for j in range(index - left, index))
+        and all(value >= candles[j]["high"] for j in range(index + 1, index + right + 1))
     )
 
-    return cleaned
+
+def is_pivot_low(candles, index, left, right):
+    if index - left < 0 or index + right >= len(candles):
+        return False
+
+    value = candles[index]["low"]
+
+    return (
+        all(value < candles[j]["low"] for j in range(index - left, index))
+        and all(value <= candles[j]["low"] for j in range(index + 1, index + right + 1))
+    )
 
 
-@app.get("/", response_class=HTMLResponse)
-def home():
-    index_file = STATIC_DIR / "index.html"
+def calculate_atr(candles, period):
+    """Wilder ATR, similar to ta.atr() in Pine."""
+    result = [None] * len(candles)
+    if len(candles) < period + 1:
+        return result
 
-    if not index_file.is_file():
-        raise HTTPException(
-            status_code=500,
-            detail="فایل static/index.html پیدا نشد."
+    true_ranges = [None] * len(candles)
+
+    for i, c in enumerate(candles):
+        if i == 0:
+            true_ranges[i] = c["high"] - c["low"]
+        else:
+            prev_close = candles[i - 1]["close"]
+            true_ranges[i] = max(
+                c["high"] - c["low"],
+                abs(c["high"] - prev_close),
+                abs(c["low"] - prev_close),
+            )
+
+    seed = sum(true_ranges[1:period + 1]) / period
+    result[period] = seed
+    previous = seed
+
+    for i in range(period + 1, len(candles)):
+        previous = (previous * (period - 1) + true_ranges[i]) / period
+        result[i] = previous
+
+    return result
+
+
+# ---------------------------------------------------------
+# Build confirmed 4H order-block events
+# ---------------------------------------------------------
+
+def build_htf_events(candles):
+    events = []
+    last_ph = None
+    last_pl = None
+    trend = 0
+
+    for i, c in enumerate(candles):
+        # A pivot becomes known only after its right-hand candles exist.
+        candidate = i - PIVOT4
+
+        if candidate >= PIVOT4:
+            if is_pivot_high(candles, candidate, PIVOT4, PIVOT4):
+                last_ph = candles[candidate]["high"]
+
+            if is_pivot_low(candles, candidate, PIVOT4, PIVOT4):
+                last_pl = candles[candidate]["low"]
+
+        bull_top = bull_bottom = bull_left = None
+        bear_top = bear_bottom = bear_left = None
+
+        body = candle_body(c)
+        prior_bodies = [
+            candle_body(candles[j])
+            for j in range(max(0, i - BODY_LEN), i)
+        ]
+        avg_prior_body = (
+            sum(prior_bodies) / BODY_LEN
+            if len(prior_bodies) == BODY_LEN
+            else None
+        )
+        strong = avg_prior_body is not None and body > avg_prior_body
+
+        bull_bos = (
+            last_ph is not None
+            and c["close"] > last_ph
+            and i > 0
+            and candles[i - 1]["close"] <= last_ph
+        )
+        bear_bos = (
+            last_pl is not None
+            and c["close"] < last_pl
+            and i > 0
+            and candles[i - 1]["close"] >= last_pl
         )
 
-    return HTMLResponse(
-        index_file.read_text(encoding="utf-8")
+        if bull_bos:
+            trend = 1
+            if strong:
+                for j in range(1, OB_SEARCH + 1):
+                    k = i - j
+                    if k >= 0 and candles[k]["close"] < candles[k]["open"]:
+                        bull_top = candles[k]["high"]
+                        bull_bottom = candles[k]["low"]
+                        bull_left = candles[k]["time"]
+                        break
+
+        if bear_bos:
+            trend = -1
+            if strong:
+                for j in range(1, OB_SEARCH + 1):
+                    k = i - j
+                    if k >= 0 and candles[k]["close"] > candles[k]["open"]:
+                        bear_top = candles[k]["high"]
+                        bear_bottom = candles[k]["low"]
+                        bear_left = candles[k]["time"]
+                        break
+
+        events.append({
+            "time": c["close_time"],
+            "close": c["close"],
+            "trend": trend,
+            "bull_top": bull_top,
+            "bull_bottom": bull_bottom,
+            "bull_left": bull_left,
+            "bear_top": bear_top,
+            "bear_bottom": bear_bottom,
+            "bear_left": bear_left,
+        })
+
+    return events
+
+
+# ---------------------------------------------------------
+# Strategy replay: 4H OB + 15M touch/CHoCH/retest/confirm
+# ---------------------------------------------------------
+
+def analyze_symbol(symbol):
+    htf = get_klines(symbol, "4h", HTF_LIMIT)
+    entry = get_klines(symbol, "15m", ENTRY_LIMIT)
+
+    if len(htf) < 30 or len(entry) < 60:
+        raise RuntimeError("Not enough closed candles returned by WEEX.")
+
+    atrs = calculate_atr(entry, ATR_LEN)
+    htf_events = build_htf_events(htf)
+
+    order_blocks = []
+    event_index = 0
+    trend4h = 0
+    last_ph15 = None
+    last_pl15 = None
+
+    position = 0
+    current_sl = None
+    current_tp = None
+    entry_price = None
+    initial_risk = None
+
+    latest_signal = None
+
+    for i, c in enumerate(entry):
+        # Apply every fully closed 4H candle known by this 15M close.
+        while event_index < len(htf_events) and htf_events[event_index]["time"] <= c["close_time"]:
+            event = htf_events[event_index]
+            trend4h = event["trend"]
+
+            for ob in order_blocks:
+                if not ob["active"]:
+                    continue
+                if ob["direction"] == 1 and event["close"] < ob["bottom"]:
+                    ob["active"] = False
+                elif ob["direction"] == -1 and event["close"] > ob["top"]:
+                    ob["active"] = False
+
+            if event["bull_left"] is not None:
+                order_blocks.append({
+                    "top": event["bull_top"],
+                    "bottom": event["bull_bottom"],
+                    "direction": 1,
+                    "left": event["bull_left"],
+                    "active": True,
+                    "used": False,
+                    "touched": False,
+                    "touch_bar": None,
+                    "has_choch": False,
+                    "choch_level": None,
+                    "choch_bar": None,
+                })
+
+            if event["bear_left"] is not None:
+                order_blocks.append({
+                    "top": event["bear_top"],
+                    "bottom": event["bear_bottom"],
+                    "direction": -1,
+                    "left": event["bear_left"],
+                    "active": True,
+                    "used": False,
+                    "touched": False,
+                    "touch_bar": None,
+                    "has_choch": False,
+                    "choch_level": None,
+                    "choch_bar": None,
+                })
+
+            event_index += 1
+
+        # Match the storage cap in the Pine strategy.
+        if len(order_blocks) > 200:
+            order_blocks = order_blocks[-200:]
+
+        candidate = i - PIVOT15
+        if candidate >= PIVOT15:
+            if is_pivot_high(entry, candidate, PIVOT15, PIVOT15):
+                last_ph15 = entry[candidate]["high"]
+            if is_pivot_low(entry, candidate, PIVOT15, PIVOT15):
+                last_pl15 = entry[candidate]["low"]
+
+        atr = atrs[i]
+        if atr is None or i == 0:
+            continue
+
+        # Simulated position management; no exchange orders are placed.
+        if position == 1 and current_sl is not None and current_tp is not None:
+            if c["high"] >= entry_price + initial_risk * BREAK_EVEN_TRIGGER_R:
+                current_sl = max(current_sl, entry_price)
+            if c["low"] <= current_sl or c["high"] >= current_tp:
+                position = 0
+
+        elif position == -1 and current_sl is not None and current_tp is not None:
+            if c["low"] <= entry_price - initial_risk * BREAK_EVEN_TRIGGER_R:
+                current_sl = min(current_sl, entry_price)
+            if c["high"] >= current_sl or c["low"] <= current_tp:
+                position = 0
+
+        if position != 0:
+            continue
+
+        tolerance = atr * RETEST_ATR
+        chosen = None
+
+        # Pine iterates stored OBs from oldest to newest.
+        for ob in order_blocks:
+            if not ob["active"] or ob["used"]:
+                continue
+
+            direction = ob["direction"]
+            if direction == 1 and trend4h != 1:
+                continue
+            if direction == -1 and trend4h != -1:
+                continue
+
+            touched_now = c["low"] <= ob["top"] and c["high"] >= ob["bottom"]
+            if touched_now:
+                ob["touched"] = True
+                ob["touch_bar"] = i
+
+            touch_bar = ob["touch_bar"]
+            fresh = (
+                ob["touched"]
+                and touch_bar is not None
+                and i - touch_bar <= MAX_BARS_SINCE_TOUCH
+            )
+            if not fresh:
+                continue
+
+            bull_cross = (
+                direction == 1
+                and last_ph15 is not None
+                and c["close"] > last_ph15
+                and entry[i - 1]["close"] <= last_ph15
+                and c["close"] > c["open"]
+                and c["close"] - c["open"] >= atr * MIN_CHOCH_BODY_ATR
+            )
+            bear_cross = (
+                direction == -1
+                and last_pl15 is not None
+                and c["close"] < last_pl15
+                and entry[i - 1]["close"] >= last_pl15
+                and c["close"] < c["open"]
+                and c["open"] - c["close"] >= atr * MIN_CHOCH_BODY_ATR
+            )
+
+            if not ob["has_choch"] and bull_cross:
+                ob["has_choch"] = True
+                ob["choch_level"] = last_ph15
+                ob["choch_bar"] = i
+
+            if not ob["has_choch"] and bear_cross:
+                ob["has_choch"] = True
+                ob["choch_level"] = last_pl15
+                ob["choch_bar"] = i
+
+            choch_bar = ob["choch_bar"]
+            if ob["has_choch"] and choch_bar is not None and i - choch_bar > MAX_WAIT:
+                ob["has_choch"] = False
+                ob["choch_level"] = None
+                ob["choch_bar"] = None
+
+            if not ob["has_choch"] or choch_bar is None or i <= choch_bar:
+                continue
+
+            level = ob["choch_level"]
+            if level is None:
+                continue
+
+            retest_detected = (
+                c["low"] <= level + tolerance
+                and c["high"] >= level - tolerance
+            )
+            if not retest_detected:
+                continue
+
+            if direction == 1:
+                confirm = (
+                    c["close"] > c["open"]
+                    and c["close"] > level
+                    and c["close"] - c["open"] >= atr * MIN_CONFIRM_BODY_ATR
+                )
+                if not confirm or last_pl15 is None:
+                    continue
+
+                sl_base = min(last_pl15, ob["bottom"])
+                sl = sl_base - atr * SL_BUFFER_ATR
+                if sl >= c["close"] or c["close"] - sl <= 0:
+                    continue
+
+                chosen = (ob, "BUY", sl, c["close"])
+                break
+
+            else:
+                confirm = (
+                    c["close"] < c["open"]
+                    and c["close"] < level
+                    and c["open"] - c["close"] >= atr * MIN_CONFIRM_BODY_ATR
+                )
+                if not confirm or last_ph15 is None:
+                    continue
+
+                sl_base = max(last_ph15, ob["top"])
+                sl = sl_base + atr * SL_BUFFER_ATR
+                if sl <= c["close"] or sl - c["close"] <= 0:
+                    continue
+
+                chosen = (ob, "SELL", sl, c["close"])
+                break
+
+        if chosen:
+            ob, side, sl, price = chosen
+            risk = abs(price - sl)
+            tp = price + risk * RISK_REWARD if side == "BUY" else price - risk * RISK_REWARD
+
+            position = 1 if side == "BUY" else -1
+            current_sl = sl
+            current_tp = tp
+            entry_price = price
+            initial_risk = risk
+            ob["used"] = True
+
+            latest_signal = {
+                "symbol": symbol,
+                "side": side,
+                "entry": price,
+                "sl": sl,
+                "tp": tp,
+                "candle_time": c["close_time"],
+                "trend4h": trend4h,
+            }
+
+    last_prices[symbol] = entry[-1]["close"]
+    return latest_signal
+
+
+# ---------------------------------------------------------
+# Telegram signal and scanner loop
+# ---------------------------------------------------------
+
+def format_price(value):
+    if value >= 1000:
+        return f"{value:.2f}"
+    if value >= 1:
+        return f"{value:.5f}".rstrip("0").rstrip(".")
+    return f"{value:.8f}".rstrip("0").rstrip(".")
+
+
+def signal_message(signal):
+    side_fa = "خرید 🟢" if signal["side"] == "BUY" else "فروش 🔴"
+    candle_time = datetime.fromtimestamp(
+        signal["candle_time"] / 1000, timezone.utc
+    ).strftime("%Y-%m-%d %H:%M UTC")
+
+    return (
+        f"📊 سیگنال استراتژی WEEX\n\n"
+        f"ارز: {signal['symbol']}\n"
+        f"جهت: {side_fa}\n"
+        f"تایم‌فریم اردربلاک: 4H\n"
+        f"تایم‌فریم ورود: 15M\n\n"
+        f"ورود تقریبی: {format_price(signal['entry'])}\n"
+        f"حد ضرر: {format_price(signal['sl'])}\n"
+        f"حد سود (RR 1:2): {format_price(signal['tp'])}\n\n"
+        f"کندل سیگنال: {candle_time}\n"
+        f"⚠️ فقط سیگنال؛ معامله واقعی باز نشده است."
     )
 
 
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "service": "WEEX Persian Scanner"}
+async def scan_loop():
+    global latest_signals
+
+    while True:
+        for symbol in list(selected_symbols):
+            try:
+                signal = await asyncio.to_thread(analyze_symbol, symbol)
+                scanner_errors.pop(symbol, None)
+
+                if not signal:
+                    continue
+
+                latest_signals[symbol] = signal
+                signal_key = f"{signal['side']}:{signal['candle_time']}"
+
+                if last_sent.get(symbol) != signal_key:
+                    await asyncio.to_thread(telegram_send, signal_message(signal))
+                    last_sent[symbol] = signal_key
+                    log.info("Telegram signal sent: %s %s", symbol, signal["side"])
+
+            except Exception as exc:
+                scanner_errors[symbol] = str(exc)
+                log.exception("Scan failed for %s", symbol)
+
+        await asyncio.sleep(POLL_SECONDS)
 
 
+@app.on_event("startup")
+async def startup_event():
+    global scanner_started
+    if not scanner_started:
+        scanner_started = True
+        asyncio.create_task(scan_loop())
+
+
+# ---------------------------------------------------------
+# Web API - keeps the existing scanner API available
+# ---------------------------------------------------------
+
+@app.get("/health")
 @app.get("/api/status")
 def status():
     return {
-        "status": "ok",
-        "mode": "signal-selection-only",
-        "live_trading_enabled": False,
-        "selected_symbols": load_symbols()
+        "ok": True,
+        "scanner": "running",
+        "symbols": selected_symbols,
+        "last_prices": last_prices,
+        "latest_signals": latest_signals,
+        "errors": scanner_errors,
+        "telegram_configured": bool(
+            os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")
+        ),
     }
 
 
 @app.get("/api/symbols")
 def get_symbols():
-    return {
-        "symbols": load_symbols(),
-        "defaults": DEFAULT_SYMBOLS
-    }
+    return {"symbols": selected_symbols}
 
 
 @app.post("/api/symbols")
-def set_symbols(selection: Selection):
-    if len(selection.symbols) > 50:
-        raise HTTPException(
-            status_code=400,
-            detail="حداکثر ۵۰ ارز مجاز است."
-        )
+def set_symbols(payload: dict):
+    global selected_symbols
 
-    return {
-        "ok": True,
-        "symbols": save_symbols(selection.symbols)
-    }
+    raw = payload.get("symbols", [])
+    if not isinstance(raw, list):
+        raise HTTPException(status_code=400, detail="symbols must be a list")
+
+    cleaned = []
+    for item in raw:
+        symbol = str(item).strip().upper()
+        symbol = symbol.replace("WEEX:", "").replace("/", "")
+        if symbol and symbol.isalnum() and symbol.endswith("USDT"):
+            if symbol not in cleaned:
+                cleaned.append(symbol)
+
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Select at least one USDT symbol")
+
+    if len(cleaned) > 30:
+        raise HTTPException(status_code=400, detail="Maximum 30 symbols")
+
+    selected_symbols = cleaned
+    return {"ok": True, "symbols": selected_symbols}
 
 
 @app.get("/api/klines")
-def get_klines(
-    symbol: str = "BTCUSDT",
-    interval: str = "15m",
-    limit: int = 200
-):
-    symbol = symbol.strip().upper()
+def api_klines(symbol: str = "BTCUSDT", interval: str = "15m", limit: int = 200):
+    symbol = symbol.upper().replace("WEEX:", "").replace("/", "")
+    allowed = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}
 
-    if (
-        not symbol.endswith("USDT")
-        or not symbol.replace("USDT", "").isalnum()
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="نماد معاملاتی نامعتبر است."
-        )
-
-    if interval not in ALLOWED_INTERVALS:
-        raise HTTPException(
-            status_code=400,
-            detail="تایم‌فریم نامعتبر است."
-        )
-
-    limit = max(1, min(limit, 1000))
+    if interval not in allowed:
+        raise HTTPException(status_code=400, detail="Unsupported interval")
 
     try:
-        response = requests.get(
-            f"{WEEX_BASE_URL}/capi/v3/market/klines",
-            params={
-                "symbol": symbol,
-                "interval": interval,
-                "limit": limit
-            },
-            timeout=20
-        )
+        candles = get_klines(symbol, interval, max(1, min(limit, 1000)))
+        return {"symbol": symbol, "interval": interval, "data": candles}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
-        response.raise_for_status()
-        raw = response.json()
 
-        # در صورت دریافت پاسخ خطا از API
-        if isinstance(raw, dict):
-            raise HTTPException(
-                status_code=502,
-                detail="WEEX پاسخ خطا برگرداند: "
-                       + str(raw.get("msg", raw.get("message", "خطای نامشخص")))
-            )
-
-        if not isinstance(raw, list):
-            raise HTTPException(
-                status_code=502,
-                detail="قالب پاسخ کندل‌های WEEX ناشناخته است."
-            )
-
-        candles = []
-
-        for item in raw:
-            if not isinstance(item, (list, tuple)) or len(item) < 6:
-                continue
-
-            try:
-                timestamp = int(float(item[0]))
-
-                # تبدیل میلی‌ثانیه به ثانیه در صورت نیاز
-                if timestamp > 10_000_000_000:
-                    timestamp //= 1000
-
-                candle = {
-                    "time": timestamp,
-                    "open": float(item[1]),
-                    "high": float(item[2]),
-                    "low": float(item[3]),
-                    "close": float(item[4]),
-                    "volume": float(item[5])
-                }
-
-                if (
-                    candle["time"] > 0
-                    and candle["open"] > 0
-                    and candle["high"] >= candle["low"]
-                    and candle["high"] > 0
-                    and candle["low"] > 0
-                    and candle["close"] > 0
-                ):
-                    candles.append(candle)
-
-            except (ValueError, TypeError, OverflowError):
-                continue
-
-        candles.sort(key=lambda item: item["time"])
-
-        # حذف زمان‌های تکراری احتمالی
-        unique = {}
-        for candle in candles:
-            unique[candle["time"]] = candle
-
-        candles = list(unique.values())
-
+@app.get("/api/ticker")
+def api_ticker(symbol: str = "BTCUSDT"):
+    symbol = symbol.upper().replace("WEEX:", "").replace("/", "")
+    try:
+        candles = get_klines(symbol, "15m", 2)
         if not candles:
-            raise HTTPException(
-                status_code=502,
-                detail="هیچ کندل معتبری از WEEX دریافت نشد؛ "
-                       "آدرس API، نماد و قالب پاسخ باید بررسی شود."
-            )
-
-        return {
-            "symbol": symbol,
-            "interval": interval,
-            "candles": candles
-        }
-
-    except HTTPException:
-        raise
-
-    except requests.RequestException:
-        raise HTTPException(
-            status_code=502,
-            detail="ارتباط با API صرافی WEEX ناموفق بود."
-        )
+            raise RuntimeError("No closed candles returned")
+        return {"symbol": symbol, "price": candles[-1]["close"]}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @app.post("/api/telegram-test")
-def telegram_test(message: TelegramMessage | None = None):
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
-    if not token or not chat_id:
-        raise HTTPException(
-            status_code=400,
-            detail="متغیرهای TELEGRAM_BOT_TOKEN و "
-                   "TELEGRAM_CHAT_ID در Render تنظیم نشده‌اند."
-        )
-
-    text = (
-        message.message
-        if message and message.message
-        else "آزمایش اتصال اسکنر فارسی WEEX"
-    )
-
+async def telegram_test():
+    global telegram_last_test
     try:
-        response = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json={
-                "chat_id": chat_id,
-                "text": text
-            },
-            timeout=15
+        await asyncio.to_thread(
+            telegram_send,
+            "✅ اتصال ربات WEEX به تلگرام برقرار است.\nاین پیام آزمایشی است."
         )
+        telegram_last_test = datetime.now(timezone.utc).isoformat()
+        return {"ok": True, "message": "Telegram test sent"}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
-        response.raise_for_status()
-        result = response.json()
 
-        if not result.get("ok"):
-            raise HTTPException(
-                status_code=502,
-                detail="تلگرام پیام را تأیید نکرد."
-            )
+# Serve the existing frontend if it exists.
+static_dir = Path(__file__).parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-        return {
-            "ok": True,
-            "message": "پیام آزمایشی تلگرام ارسال شد."
-        }
 
-    except requests.RequestException:
-        raise HTTPException(
-            status_code=502,
-            detail="ارسال پیام ناموفق بود؛ تنظیمات تلگرام و "
-                   "ارتباط سرور را بررسی کنید."
-        )
+@app.get("/", response_class=HTMLResponse)
+def home():
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return index_file.read_text(encoding="utf-8")
+    return """
+    <html><head><meta charset="utf-8"><title>WEEX Scanner</title></head>
+    <body style="font-family:Arial;max-width:800px;margin:40px auto">
+    <h2>WEEX Telegram Scanner</h2>
+    <p>ربات در حال اجرا است.</p>
+    <p><a href="/api/status">وضعیت ربات</a></p>
+    <p><a href="/docs">API documentation</a></p>
+    </body></html>
+    """
