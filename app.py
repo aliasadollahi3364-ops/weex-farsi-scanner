@@ -2,17 +2,19 @@ import os
 import time
 import asyncio
 import logging
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
 # =========================================================
 # WEEX 4H ORDER BLOCK + 15M CHoCH TELEGRAM SCANNER
 # Signal-only bot. No real orders are submitted.
+# Duplicate/old signal protection added.
 # =========================================================
 
 app = FastAPI(title="WEEX Farsi Scanner")
@@ -25,7 +27,7 @@ DEFAULT_SYMBOLS = [
     "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "LINKUSDT", "LTCUSDT"
 ]
 
-# Strategy settings from the supplied Pine Script
+# Strategy settings - unchanged
 HTF_LIMIT = 300
 ENTRY_LIMIT = 600
 PIVOT4 = 3
@@ -47,12 +49,99 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("weex-scanner")
 
 selected_symbols = DEFAULT_SYMBOLS.copy()
-last_sent = {}
 latest_signals = {}
 last_prices = {}
 scanner_errors = {}
 scanner_started = False
 telegram_last_test = None
+
+# ---------------------------------------------------------
+# Duplicate / old signal protection
+# ---------------------------------------------------------
+
+# May be overridden in Render with SIGNAL_STATE_FILE.
+STATE_FILE = Path(
+    os.getenv(
+        "SIGNAL_STATE_FILE",
+        str(Path(__file__).parent / "signal_state.json")
+    )
+)
+
+# Last processed signal key per symbol, persisted to disk.
+# Format: {"BTCUSDT": "BUY:1792732500000"}
+last_processed = {}
+
+# Latest closed 15m candle time observed for each symbol.
+last_closed_candle_times = {}
+
+# Baseline is established on the first successful scan per symbol.
+# Signals at or before this candle are historical and will not be sent.
+startup_baselines = {}
+
+
+def load_state():
+    global last_processed
+
+    try:
+        if not STATE_FILE.exists():
+            log.info("No saved signal state found; starting fresh.")
+            return
+
+        with STATE_FILE.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        saved = data.get("last_processed", {})
+        if isinstance(saved, dict):
+            last_processed = {
+                str(symbol): str(key)
+                for symbol, key in saved.items()
+                if isinstance(symbol, str) and isinstance(key, str)
+            }
+
+        log.info(
+            "Loaded saved signal state for %d symbols.",
+            len(last_processed)
+        )
+
+    except Exception:
+        log.exception("Could not load signal state; starting with empty state.")
+
+
+def save_state():
+    """Atomically save processed signal IDs."""
+    temp_file = STATE_FILE.with_suffix(STATE_FILE.suffix + ".tmp")
+
+    try:
+        STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+        payload = {
+            "last_processed": last_processed,
+            "saved_at_utc": datetime.now(timezone.utc).isoformat(),
+        }
+
+        with temp_file.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, ensure_ascii=False, indent=2)
+            file.flush()
+            os.fsync(file.fileno())
+
+        os.replace(temp_file, STATE_FILE)
+
+    except Exception:
+        log.exception("Could not save signal state.")
+
+        try:
+            if temp_file.exists():
+                temp_file.unlink()
+        except OSError:
+            pass
+
+
+def signal_key(signal):
+    return f"{signal['side']}:{int(signal['candle_time'])}"
+
+
+load_state()
+
 
 # ---------------------------------------------------------
 # WEEX market data
@@ -77,17 +166,19 @@ def get_klines(symbol, interval, limit):
         rows = payload
 
     if not isinstance(rows, list):
-        raise RuntimeError(f"Unexpected WEEX kline response: {str(payload)[:200]}")
+        raise RuntimeError(
+            f"Unexpected WEEX kline response: {str(payload)[:200]}"
+        )
 
     candles = []
     now_ms = int(time.time() * 1000)
 
     for row in rows:
         try:
-            # WEEX format:
-            # [open time, open, high, low, close, volume, close time]
             if isinstance(row, dict):
-                t = int(row.get("time", row.get("openTime", row.get("open_time"))))
+                t = int(
+                    row.get("time", row.get("openTime", row.get("open_time")))
+                )
                 o = float(row.get("open"))
                 h = float(row.get("high"))
                 low = float(row.get("low"))
@@ -103,7 +194,7 @@ def get_klines(symbol, interval, limit):
                 v = float(row[5]) if len(row) > 5 else 0.0
                 ct = int(row[6]) if len(row) > 6 else t
 
-            # Do not use a candle that has not closed yet.
+            # Ignore candles that have not closed yet.
             if ct >= now_ms:
                 continue
 
@@ -116,12 +207,12 @@ def get_klines(symbol, interval, limit):
                 "close": c,
                 "volume": v,
             })
+
         except (TypeError, ValueError, IndexError):
             continue
 
     candles.sort(key=lambda x: x["time"])
 
-    # Remove duplicate timestamps.
     unique = {}
     for candle in candles:
         unique[candle["time"]] = candle
@@ -170,7 +261,10 @@ def is_pivot_high(candles, index, left, right):
 
     return (
         all(value > candles[j]["high"] for j in range(index - left, index))
-        and all(value >= candles[j]["high"] for j in range(index + 1, index + right + 1))
+        and all(
+            value >= candles[j]["high"]
+            for j in range(index + 1, index + right + 1)
+        )
     )
 
 
@@ -182,13 +276,17 @@ def is_pivot_low(candles, index, left, right):
 
     return (
         all(value < candles[j]["low"] for j in range(index - left, index))
-        and all(value <= candles[j]["low"] for j in range(index + 1, index + right + 1))
+        and all(
+            value <= candles[j]["low"]
+            for j in range(index + 1, index + right + 1)
+        )
     )
 
 
 def calculate_atr(candles, period):
     """Wilder ATR, similar to ta.atr() in Pine."""
     result = [None] * len(candles)
+
     if len(candles) < period + 1:
         return result
 
@@ -210,7 +308,9 @@ def calculate_atr(candles, period):
     previous = seed
 
     for i in range(period + 1, len(candles)):
-        previous = (previous * (period - 1) + true_ranges[i]) / period
+        previous = (
+            previous * (period - 1) + true_ranges[i]
+        ) / period
         result[i] = previous
 
     return result
@@ -227,7 +327,6 @@ def build_htf_events(candles):
     trend = 0
 
     for i, c in enumerate(candles):
-        # A pivot becomes known only after its right-hand candles exist.
         candidate = i - PIVOT4
 
         if candidate >= PIVOT4:
@@ -245,12 +344,16 @@ def build_htf_events(candles):
             candle_body(candles[j])
             for j in range(max(0, i - BODY_LEN), i)
         ]
+
         avg_prior_body = (
             sum(prior_bodies) / BODY_LEN
             if len(prior_bodies) == BODY_LEN
             else None
         )
-        strong = avg_prior_body is not None and body > avg_prior_body
+        strong = (
+            avg_prior_body is not None
+            and body > avg_prior_body
+        )
 
         bull_bos = (
             last_ph is not None
@@ -258,6 +361,7 @@ def build_htf_events(candles):
             and i > 0
             and candles[i - 1]["close"] <= last_ph
         )
+
         bear_bos = (
             last_pl is not None
             and c["close"] < last_pl
@@ -267,6 +371,7 @@ def build_htf_events(candles):
 
         if bull_bos:
             trend = 1
+
             if strong:
                 for j in range(1, OB_SEARCH + 1):
                     k = i - j
@@ -278,6 +383,7 @@ def build_htf_events(candles):
 
         if bear_bos:
             trend = -1
+
             if strong:
                 for j in range(1, OB_SEARCH + 1):
                     k = i - j
@@ -304,6 +410,7 @@ def build_htf_events(candles):
 
 # ---------------------------------------------------------
 # Strategy replay: 4H OB + 15M touch/CHoCH/retest/confirm
+# Strategy logic unchanged
 # ---------------------------------------------------------
 
 def analyze_symbol(symbol):
@@ -312,6 +419,9 @@ def analyze_symbol(symbol):
 
     if len(htf) < 30 or len(entry) < 60:
         raise RuntimeError("Not enough closed candles returned by WEEX.")
+
+    # Save the latest closed 15m candle timestamp for startup baseline.
+    last_closed_candle_times[symbol] = entry[-1]["close_time"]
 
     atrs = calculate_atr(entry, ATR_LEN)
     htf_events = build_htf_events(htf)
@@ -331,17 +441,26 @@ def analyze_symbol(symbol):
     latest_signal = None
 
     for i, c in enumerate(entry):
-        # Apply every fully closed 4H candle known by this 15M close.
-        while event_index < len(htf_events) and htf_events[event_index]["time"] <= c["close_time"]:
+        while (
+            event_index < len(htf_events)
+            and htf_events[event_index]["time"] <= c["close_time"]
+        ):
             event = htf_events[event_index]
             trend4h = event["trend"]
 
             for ob in order_blocks:
                 if not ob["active"]:
                     continue
-                if ob["direction"] == 1 and event["close"] < ob["bottom"]:
+
+                if (
+                    ob["direction"] == 1
+                    and event["close"] < ob["bottom"]
+                ):
                     ob["active"] = False
-                elif ob["direction"] == -1 and event["close"] > ob["top"]:
+                elif (
+                    ob["direction"] == -1
+                    and event["close"] > ob["top"]
+                ):
                     ob["active"] = False
 
             if event["bull_left"] is not None:
@@ -376,31 +495,49 @@ def analyze_symbol(symbol):
 
             event_index += 1
 
-        # Match the storage cap in the Pine strategy.
         if len(order_blocks) > 200:
             order_blocks = order_blocks[-200:]
 
         candidate = i - PIVOT15
+
         if candidate >= PIVOT15:
             if is_pivot_high(entry, candidate, PIVOT15, PIVOT15):
                 last_ph15 = entry[candidate]["high"]
+
             if is_pivot_low(entry, candidate, PIVOT15, PIVOT15):
                 last_pl15 = entry[candidate]["low"]
 
         atr = atrs[i]
+
         if atr is None or i == 0:
             continue
 
         # Simulated position management; no exchange orders are placed.
-        if position == 1 and current_sl is not None and current_tp is not None:
-            if c["high"] >= entry_price + initial_risk * BREAK_EVEN_TRIGGER_R:
+        if (
+            position == 1
+            and current_sl is not None
+            and current_tp is not None
+        ):
+            if (
+                c["high"]
+                >= entry_price + initial_risk * BREAK_EVEN_TRIGGER_R
+            ):
                 current_sl = max(current_sl, entry_price)
+
             if c["low"] <= current_sl or c["high"] >= current_tp:
                 position = 0
 
-        elif position == -1 and current_sl is not None and current_tp is not None:
-            if c["low"] <= entry_price - initial_risk * BREAK_EVEN_TRIGGER_R:
+        elif (
+            position == -1
+            and current_sl is not None
+            and current_tp is not None
+        ):
+            if (
+                c["low"]
+                <= entry_price - initial_risk * BREAK_EVEN_TRIGGER_R
+            ):
                 current_sl = min(current_sl, entry_price)
+
             if c["high"] >= current_sl or c["low"] <= current_tp:
                 position = 0
 
@@ -410,28 +547,35 @@ def analyze_symbol(symbol):
         tolerance = atr * RETEST_ATR
         chosen = None
 
-        # Pine iterates stored OBs from oldest to newest.
         for ob in order_blocks:
             if not ob["active"] or ob["used"]:
                 continue
 
             direction = ob["direction"]
+
             if direction == 1 and trend4h != 1:
                 continue
+
             if direction == -1 and trend4h != -1:
                 continue
 
-            touched_now = c["low"] <= ob["top"] and c["high"] >= ob["bottom"]
+            touched_now = (
+                c["low"] <= ob["top"]
+                and c["high"] >= ob["bottom"]
+            )
+
             if touched_now:
                 ob["touched"] = True
                 ob["touch_bar"] = i
 
             touch_bar = ob["touch_bar"]
+
             fresh = (
                 ob["touched"]
                 and touch_bar is not None
                 and i - touch_bar <= MAX_BARS_SINCE_TOUCH
             )
+
             if not fresh:
                 continue
 
@@ -443,6 +587,7 @@ def analyze_symbol(symbol):
                 and c["close"] > c["open"]
                 and c["close"] - c["open"] >= atr * MIN_CHOCH_BODY_ATR
             )
+
             bear_cross = (
                 direction == -1
                 and last_pl15 is not None
@@ -463,15 +608,25 @@ def analyze_symbol(symbol):
                 ob["choch_bar"] = i
 
             choch_bar = ob["choch_bar"]
-            if ob["has_choch"] and choch_bar is not None and i - choch_bar > MAX_WAIT:
+
+            if (
+                ob["has_choch"]
+                and choch_bar is not None
+                and i - choch_bar > MAX_WAIT
+            ):
                 ob["has_choch"] = False
                 ob["choch_level"] = None
                 ob["choch_bar"] = None
 
-            if not ob["has_choch"] or choch_bar is None or i <= choch_bar:
+            if (
+                not ob["has_choch"]
+                or choch_bar is None
+                or i <= choch_bar
+            ):
                 continue
 
             level = ob["choch_level"]
+
             if level is None:
                 continue
 
@@ -479,6 +634,7 @@ def analyze_symbol(symbol):
                 c["low"] <= level + tolerance
                 and c["high"] >= level - tolerance
             )
+
             if not retest_detected:
                 continue
 
@@ -486,13 +642,16 @@ def analyze_symbol(symbol):
                 confirm = (
                     c["close"] > c["open"]
                     and c["close"] > level
-                    and c["close"] - c["open"] >= atr * MIN_CONFIRM_BODY_ATR
+                    and c["close"] - c["open"]
+                    >= atr * MIN_CONFIRM_BODY_ATR
                 )
+
                 if not confirm or last_pl15 is None:
                     continue
 
                 sl_base = min(last_pl15, ob["bottom"])
                 sl = sl_base - atr * SL_BUFFER_ATR
+
                 if sl >= c["close"] or c["close"] - sl <= 0:
                     continue
 
@@ -503,13 +662,16 @@ def analyze_symbol(symbol):
                 confirm = (
                     c["close"] < c["open"]
                     and c["close"] < level
-                    and c["open"] - c["close"] >= atr * MIN_CONFIRM_BODY_ATR
+                    and c["open"] - c["close"]
+                    >= atr * MIN_CONFIRM_BODY_ATR
                 )
+
                 if not confirm or last_ph15 is None:
                     continue
 
                 sl_base = max(last_ph15, ob["top"])
                 sl = sl_base + atr * SL_BUFFER_ATR
+
                 if sl <= c["close"] or sl - c["close"] <= 0:
                     continue
 
@@ -519,7 +681,12 @@ def analyze_symbol(symbol):
         if chosen:
             ob, side, sl, price = chosen
             risk = abs(price - sl)
-            tp = price + risk * RISK_REWARD if side == "BUY" else price - risk * RISK_REWARD
+
+            tp = (
+                price + risk * RISK_REWARD
+                if side == "BUY"
+                else price - risk * RISK_REWARD
+            )
 
             position = 1 if side == "BUY" else -1
             current_sl = sl
@@ -543,21 +710,25 @@ def analyze_symbol(symbol):
 
 
 # ---------------------------------------------------------
-# Telegram signal and scanner loop
+# Telegram signal formatting
 # ---------------------------------------------------------
 
 def format_price(value):
     if value >= 1000:
         return f"{value:.2f}"
+
     if value >= 1:
         return f"{value:.5f}".rstrip("0").rstrip(".")
+
     return f"{value:.8f}".rstrip("0").rstrip(".")
 
 
 def signal_message(signal):
     side_fa = "خرید 🟢" if signal["side"] == "BUY" else "فروش 🔴"
+
     candle_time = datetime.fromtimestamp(
-        signal["candle_time"] / 1000, timezone.utc
+        signal["candle_time"] / 1000,
+        timezone.utc
     ).strftime("%Y-%m-%d %H:%M UTC")
 
     return (
@@ -574,25 +745,71 @@ def signal_message(signal):
     )
 
 
-async def scan_loop():
-    global latest_signals
+# ---------------------------------------------------------
+# Scanner loop - duplicate/old signal handling
+# ---------------------------------------------------------
 
+async def scan_loop():
     while True:
         for symbol in list(selected_symbols):
             try:
                 signal = await asyncio.to_thread(analyze_symbol, symbol)
                 scanner_errors.pop(symbol, None)
 
+                # Establish the baseline on the first successful scan.
+                # The latest historical signal must not be sent as new.
+                if symbol not in startup_baselines:
+                    startup_baselines[symbol] = (
+                        last_closed_candle_times.get(symbol)
+                    )
+                    log.info(
+                        "%s startup baseline: %s",
+                        symbol,
+                        startup_baselines[symbol],
+                    )
+
                 if not signal:
                     continue
 
                 latest_signals[symbol] = signal
-                signal_key = f"{signal['side']}:{signal['candle_time']}"
+                key = signal_key(signal)
 
-                if last_sent.get(symbol) != signal_key:
-                    await asyncio.to_thread(telegram_send, signal_message(signal))
-                    last_sent[symbol] = signal_key
-                    log.info("Telegram signal sent: %s %s", symbol, signal["side"])
+                # Already processed this exact signal.
+                if last_processed.get(symbol) == key:
+                    continue
+
+                baseline = startup_baselines.get(symbol)
+                signal_time = int(signal["candle_time"])
+
+                # Historical signal at startup: mark it as processed,
+                # but do not send it to Telegram.
+                if baseline is not None and signal_time <= baseline:
+                    last_processed[symbol] = key
+                    save_state()
+
+                    log.info(
+                        "Suppressed historical signal: %s %s at %s",
+                        symbol,
+                        signal["side"],
+                        signal_time,
+                    )
+                    continue
+
+                # Send first; only mark processed after Telegram succeeds.
+                await asyncio.to_thread(
+                    telegram_send,
+                    signal_message(signal)
+                )
+
+                last_processed[symbol] = key
+                save_state()
+
+                log.info(
+                    "Telegram signal sent: %s %s at %s",
+                    symbol,
+                    signal["side"],
+                    signal_time,
+                )
 
             except Exception as exc:
                 scanner_errors[symbol] = str(exc)
@@ -604,13 +821,14 @@ async def scan_loop():
 @app.on_event("startup")
 async def startup_event():
     global scanner_started
+
     if not scanner_started:
         scanner_started = True
         asyncio.create_task(scan_loop())
 
 
 # ---------------------------------------------------------
-# Web API - keeps the existing scanner API available
+# Web API
 # ---------------------------------------------------------
 
 @app.get("/health")
@@ -624,8 +842,12 @@ def status():
         "latest_signals": latest_signals,
         "errors": scanner_errors,
         "telegram_configured": bool(
-            os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")
+            os.getenv("TELEGRAM_BOT_TOKEN")
+            and os.getenv("TELEGRAM_CHAT_ID")
         ),
+        "duplicate_protection": True,
+        "state_file": str(STATE_FILE),
+        "startup_baselines_set": list(startup_baselines.keys()),
     }
 
 
@@ -639,38 +861,68 @@ def set_symbols(payload: dict):
     global selected_symbols
 
     raw = payload.get("symbols", [])
+
     if not isinstance(raw, list):
-        raise HTTPException(status_code=400, detail="symbols must be a list")
+        raise HTTPException(
+            status_code=400,
+            detail="symbols must be a list"
+        )
 
     cleaned = []
+
     for item in raw:
         symbol = str(item).strip().upper()
         symbol = symbol.replace("WEEX:", "").replace("/", "")
+
         if symbol and symbol.isalnum() and symbol.endswith("USDT"):
             if symbol not in cleaned:
                 cleaned.append(symbol)
 
     if not cleaned:
-        raise HTTPException(status_code=400, detail="Select at least one USDT symbol")
+        raise HTTPException(
+            status_code=400,
+            detail="Select at least one USDT symbol"
+        )
 
     if len(cleaned) > 30:
-        raise HTTPException(status_code=400, detail="Maximum 30 symbols")
+        raise HTTPException(
+            status_code=400,
+            detail="Maximum 30 symbols"
+        )
 
     selected_symbols = cleaned
+
     return {"ok": True, "symbols": selected_symbols}
 
 
 @app.get("/api/klines")
-def api_klines(symbol: str = "BTCUSDT", interval: str = "15m", limit: int = 200):
+def api_klines(
+    symbol: str = "BTCUSDT",
+    interval: str = "15m",
+    limit: int = 200
+):
     symbol = symbol.upper().replace("WEEX:", "").replace("/", "")
     allowed = {"1m", "5m", "15m", "30m", "1h", "4h", "1d"}
 
     if interval not in allowed:
-        raise HTTPException(status_code=400, detail="Unsupported interval")
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported interval"
+        )
 
     try:
-        candles = get_klines(symbol, interval, max(1, min(limit, 1000)))
-        return {"symbol": symbol, "interval": interval, "data": candles}
+        candles = get_klines(
+            symbol,
+            interval,
+            max(1, min(limit, 1000))
+        )
+
+        return {
+            "symbol": symbol,
+            "interval": interval,
+            "data": candles
+        }
+
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -678,11 +930,18 @@ def api_klines(symbol: str = "BTCUSDT", interval: str = "15m", limit: int = 200)
 @app.get("/api/ticker")
 def api_ticker(symbol: str = "BTCUSDT"):
     symbol = symbol.upper().replace("WEEX:", "").replace("/", "")
+
     try:
         candles = get_klines(symbol, "15m", 2)
+
         if not candles:
             raise RuntimeError("No closed candles returned")
-        return {"symbol": symbol, "price": candles[-1]["close"]}
+
+        return {
+            "symbol": symbol,
+            "price": candles[-1]["close"]
+        }
+
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -690,34 +949,56 @@ def api_ticker(symbol: str = "BTCUSDT"):
 @app.post("/api/telegram-test")
 async def telegram_test():
     global telegram_last_test
+
     try:
         await asyncio.to_thread(
             telegram_send,
-            "✅ اتصال ربات WEEX به تلگرام برقرار است.\nاین پیام آزمایشی است."
+            "✅ اتصال ربات WEEX به تلگرام برقرار است.\n"
+            "این پیام آزمایشی است."
         )
+
         telegram_last_test = datetime.now(timezone.utc).isoformat()
-        return {"ok": True, "message": "Telegram test sent"}
+
+        return {
+            "ok": True,
+            "message": "Telegram test sent"
+        }
+
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# Serve the existing frontend if it exists.
+# ---------------------------------------------------------
+# Frontend
+# ---------------------------------------------------------
+
 static_dir = Path(__file__).parent / "static"
+
 if static_dir.exists():
-    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(static_dir)),
+        name="static"
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
 def home():
     index_file = static_dir / "index.html"
+
     if index_file.exists():
         return index_file.read_text(encoding="utf-8")
+
     return """
-    <html><head><meta charset="utf-8"><title>WEEX Scanner</title></head>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>WEEX Scanner</title>
+    </head>
     <body style="font-family:Arial;max-width:800px;margin:40px auto">
-    <h2>WEEX Telegram Scanner</h2>
-    <p>ربات در حال اجرا است.</p>
-    <p><a href="/api/status">وضعیت ربات</a></p>
-    <p><a href="/docs">API documentation</a></p>
-    </body></html>
-    """
+        <h2>WEEX Telegram Scanner</h2>
+        <p>ربات در حال اجرا است.</p>
+        <p><a href="/api/status">وضعیت ربات</a></p>
+        <p><a href="/docs">API documentation</a></p>
+    </body>
+    </html>
