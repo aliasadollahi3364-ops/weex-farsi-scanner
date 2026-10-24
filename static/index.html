@@ -1,1022 +1,426 @@
+
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>اسکنر فارسی WEEX | اردربلاک 4H</title>
-
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>اسکنر فارسی WEEX | OB 4H + CHoCH 15M</title>
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-
 <style>
-:root {
-  --bg:#0b1120;
-  --panel:#131d30;
-  --border:#26344b;
-  --text:#e7edf7;
-  --muted:#92a4bd;
-  --green:#20c997;
-  --red:#ff5d73;
-  --blue:#55a7ff;
-  --yellow:#ffd166;
-}
-* {box-sizing:border-box}
-body {
-  margin:0;
-  background:var(--bg);
-  color:var(--text);
-  font-family:Tahoma,Arial,sans-serif;
-}
-header {
-  background:#111b2d;
-  padding:16px;
-  border-bottom:1px solid var(--border);
-}
-h1 {font-size:20px;margin:0 0 8px}
-.subtitle {color:var(--muted);font-size:12px}
-.container {max-width:1400px;margin:auto;padding:14px}
-.grid {
-  display:grid;
-  grid-template-columns:minmax(0,1fr) 310px;
-  gap:14px;
-}
-.panel {
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:12px;
-  padding:14px;
-  margin-bottom:14px;
-  min-width:0;
-}
-h2 {font-size:15px;margin:0 0 12px}
-.row {
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  gap:10px;
-}
-label {font-size:12px;color:var(--muted)}
-select,input,button {
-  background:#0b1424;
-  color:var(--text);
-  border:1px solid var(--border);
-  padding:10px;
-  border-radius:8px;
-  font:inherit;
-  font-size:12px;
-}
-input[type="checkbox"] {accent-color:var(--green)}
-button {cursor:pointer}
-button.primary {
-  background:#146e59;
-  border-color:#18866c;
-}
-button.secondary {background:#1b2d49}
-button:disabled {opacity:.55;cursor:wait}
-#chart {
-  width:100%;
-  height:430px;
-}
-.status {
-  padding:10px;
-  border-radius:8px;
-  background:#0b1424;
-  color:var(--muted);
-  font-size:12px;
-  line-height:1.9;
-  margin-top:10px;
-  overflow-wrap:anywhere;
-}
-.status.ok {color:var(--green)}
-.status.error {color:var(--red)}
-.stats {
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:8px;
-  margin-bottom:12px;
-}
-.stat {
-  background:#0b1424;
-  border:1px solid var(--border);
-  border-radius:8px;
-  padding:12px 8px;
-}
-.stat strong {display:block;font-size:17px;margin-bottom:6px}
-.stat span {font-size:11px;color:var(--muted)}
-.list {
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-}
-.coin {
-  width:100%;
-  text-align:right;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-}
-.coin.active {border-color:var(--blue)}
-.badge {
-  font-size:10px;
-  border-radius:5px;
-  padding:5px 7px;
-  white-space:nowrap;
-}
-.buy {background:#123f38;color:#64f0c3}
-.sell {background:#49232e;color:#ff9cab}
-.neutral {background:#26344b;color:#b8c8dd}
-.small {font-size:11px;color:var(--muted);line-height:1.9}
-.checks {
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px;
-}
-.checks label {
-  display:flex;
-  gap:8px;
-  align-items:center;
-  color:var(--text);
-}
-.signal-card {
-  background:#0b1424;
-  border:1px solid var(--border);
-  border-radius:8px;
-  padding:12px;
-  margin-bottom:8px;
-  line-height:1.9;
-  font-size:12px;
-  overflow-wrap:anywhere;
-}
-.signal-card strong {font-size:14px}
-hr {border:0;border-top:1px solid var(--border);margin:14px 0}
-@media(max-width:850px) {
-  .grid {grid-template-columns:1fr}
-  #chart {height:350px}
-  .stats {grid-template-columns:repeat(3,minmax(0,1fr))}
-}
-@media(max-width:480px) {
-  .container {padding:8px}
-  .panel {padding:10px}
-  .checks {grid-template-columns:1fr}
-  #chart {height:300px}
-}
+*{box-sizing:border-box}
+body{margin:0;background:#0b1120;color:#e7edf7;font-family:Tahoma,Arial}
+header{padding:17px;background:#111b2d;border-bottom:1px solid #26344b}
+h1{font-size:20px;margin:0 0 8px}
+h2{font-size:15px;margin:0 0 13px}
+small,.muted{color:#96a8c0;font-size:11px;line-height:1.9}
+main{max-width:1450px;margin:auto;padding:12px}
+.panel{background:#131d30;border:1px solid #293952;border-radius:10px;padding:14px;margin-bottom:12px;min-width:0}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:12px}
+.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:12px;color:#b9c8dc}
+input,select,button{width:100%;background:#0b1424;color:#edf4ff;border:1px solid #34445d;border-radius:7px;padding:9px;font:inherit;font-size:12px;min-width:0}
+input[type=checkbox]{width:auto;accent-color:#20c997}
+.check{display:flex;align-items:center;gap:8px;padding:5px 0}
+button{cursor:pointer}
+button.primary{background:#126c57}
+button.secondary{background:#20304a}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.actions button{width:auto}
+#chart{height:390px;width:100%}
+#status,#telegramStatus{background:#0b1424;border-radius:7px;padding:10px;margin-top:10px;font-size:12px;line-height:1.9;overflow-wrap:anywhere}
+.ok{color:#20c997}.err{color:#ff687b}
+.coins,.signals{display:flex;flex-direction:column;gap:7px}
+.coin,.signal{border:1px solid #2b3b54;border-radius:7px;padding:10px;background:#0b1424;font-size:12px;line-height:1.9}
+.coin{display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer}
+.buy{color:#20c997}.sell{color:#ff687b}.neutral{color:#a9bad0}
+.badge{padding:4px 6px;border-radius:5px;background:#25344b;font-size:10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
+.stat{background:#0b1424;padding:10px 5px;border-radius:7px;text-align:center}
+.stat b{display:block;font-size:18px;margin-bottom:5px}
+hr{border:0;border-top:1px solid #293952;margin:16px 0}
+details summary{cursor:pointer;font-size:14px;font-weight:bold;margin-bottom:14px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}#chart{height:330px}}
 </style>
 </head>
-
 <body>
-
 <header>
-  <h1>اسکنر فارسی WEEX</h1>
-  <div class="subtitle">
-    استراتژی اردربلاک ۴ ساعته + تأیید ورود ۱۵ دقیقه‌ای
-  </div>
+<h1>اسکنر فارسی WEEX</h1>
+<div class="muted">اردربلاک ۴ ساعته + شکست ساختار و پولبک ۱۵ دقیقه‌ای</div>
 </header>
+<main>
 
-<div class="container">
-
-  <div class="panel">
-    <h2>تنظیمات اسکنر</h2>
-
-    <div class="row">
-      <label for="symbols">ارزهای موردنظر، با کاما جدا کن:</label>
-      <input id="symbols"
-        style="flex:1;min-width:220px"
-        value="BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,LTCUSDT">
-
-      <button class="secondary" id="saveSymbols">ذخیره ارزها</button>
-      <button class="primary" id="scanButton">اسکن اکنون</button>
-    </div>
-
-    <div class="row" style="margin-top:12px">
-      <label for="chartSymbol">ارز نمودار:</label>
-      <select id="chartSymbol"></select>
-
-      <label for="limit">تعداد کندل:</label>
-      <select id="limit">
-        <option value="100">100</option>
-        <option value="200" selected>200</option>
-        <option value="500">500</option>
-      </select>
-
-      <label>
-        <input type="checkbox" id="autoRefresh" checked>
-        اسکن خودکار هر ۶۰ ثانیه
-      </label>
-    </div>
-
-    <div class="small" style="margin-top:10px">
-      نمادها را بدون پیشوند WEEX وارد کن؛ برای مثال BTCUSDT.
-      اسکنر از اطلاعات ۴ ساعته و ۱۵ دقیقه‌ای استفاده می‌کند.
-    </div>
-
-    <div id="status" class="status">در انتظار دریافت اطلاعات...</div>
-  </div>
-
-  <div class="grid">
-
-    <main>
-
-      <div class="panel">
-        <h2>نمودار ۱۵ دقیقه‌ای</h2>
-        <div id="chart"></div>
-        <div class="small">
-          محدوده اردربلاک ۴ ساعته با خطوط افقی روی نمودار مشخص می‌شود.
-          این خطوط نمایشی هستند و به‌تنهایی سیگنال ورود نیستند.
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>فیلترهای استراتژی</h2>
-
-        <div class="checks">
-          <label>
-            <input type="checkbox" id="fOB" checked>
-            بررسی اردربلاک ۴ ساعته
-          </label>
-
-          <label>
-            <input type="checkbox" id="fRetest" checked>
-            الزام برخورد به اردربلاک
-          </label>
-
-          <label>
-            <input type="checkbox" id="fConfirm" checked>
-            تأیید کندل ۱۵ دقیقه‌ای
-          </label>
-
-          <label>
-            <input type="checkbox" id="fTrend">
-            فیلتر روند ساده
-          </label>
-        </div>
-
-        <hr>
-
-        <div class="row">
-          <label for="impulse">قدرت حرکت برای تشخیص OB:</label>
-          <select id="impulse">
-            <option value="1">معمولی</option>
-            <option value="1.2" selected>متوسط</option>
-            <option value="1.5">قوی</option>
-          </select>
-
-          <label for="rr">نسبت سود به ضرر:</label>
-          <select id="rr">
-            <option value="1.5">1.5</option>
-            <option value="2" selected>2</option>
-            <option value="3">3</option>
-          </select>
-        </div>
-
-        <p class="small">
-          این فیلترها بر تشخیص سیگنال همین صفحه اثر می‌گذارند.
-          تغییر تنظیمات به معنی اجرای معامله نیست.
-        </p>
-      </div>
-
-      <div class="panel">
-        <h2>آخرین سیگنال‌های اسکنر</h2>
-        <div id="signals" class="list">
-          <div class="small">هنوز اسکن انجام نشده است.</div>
-        </div>
-      </div>
-
-    </main>
-
-    <aside>
-
-      <div class="panel">
-        <h2>وضعیت بازار</h2>
-
-        <div class="stats">
-          <div class="stat">
-            <strong id="countTotal">0</strong>
-            <span>ارزها</span>
-          </div>
-
-          <div class="stat">
-            <strong id="countBuy" style="color:var(--green)">0</strong>
-            <span>خرید</span>
-          </div>
-
-          <div class="stat">
-            <strong id="countSell" style="color:var(--red)">0</strong>
-            <span>فروش</span>
-          </div>
-        </div>
-
-        <div id="coinList" class="list">
-          <div class="small">در انتظار اسکن...</div>
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>تلگرام</h2>
-
-        <p class="small">
-          برای بررسی اتصال تلگرام از دکمه زیر استفاده کن.
-          ارسال پیام فقط زمانی کار می‌کند که توکن ربات و شناسه چت
-          در متغیرهای محیطی سرور تنظیم شده باشند.
-        </p>
-
-        <button class="primary" id="telegramButton" style="width:100%">
-          تست اتصال تلگرام
-        </button>
-
-        <div id="telegramStatus" class="status">
-          هنوز آزمایشی انجام نشده است.
-        </div>
-      </div>
-
-      <div class="panel">
-        <h2>روش کار اسکنر</h2>
-        <div class="small">
-          ۱. داده‌های کندل ۴ ساعته دریافت می‌شود.<br>
-          ۲. محدوده احتمالی اردربلاک شناسایی می‌شود.<br>
-          ۳. کندل‌های ۱۵ دقیقه‌ای بررسی می‌شوند.<br>
-          ۴. در صورت برخورد و تأیید، سیگنال احتمالی نمایش داده می‌شود.<br><br>
-          سیگنال این نسخه آزمایشی است و اجرای معامله خودکار ندارد.
-        </div>
-      </div>
-
-    </aside>
-  </div>
+<section class="panel">
+<h2>ارزهای انتخابی</h2>
+<div class="fields">
+<div class="field" style="grid-column:span 2">
+<label for="symbols">نمادها (با کاما جدا کن؛ حداکثر ۱۰ ارز)</label>
+<input id="symbols" value="BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,DOGEUSDT,ADAUSDT,AVAXUSDT,LINKUSDT,LTCUSDT">
 </div>
+<div class="field"><label for="chartSymbol">ارز نمودار</label><select id="chartSymbol"></select></div>
+<div class="field"><label for="limit">تعداد کندل‌ها</label><select id="limit"><option>100</option><option selected>200</option><option>500</option></select></div>
+</div>
+<div class="actions">
+<button class="primary" id="scan">اسکن اکنون</button>
+<button class="secondary" id="save">ذخیره ارزها</button>
+<label class="check"><input type="checkbox" id="auto" checked> اسکن خودکار هر ۶۰ ثانیه</label>
+</div>
+<div id="status">آماده دریافت داده از سرور WEEX.</div>
+</section>
+
+<div class="grid">
+<div>
+<section class="panel">
+<h2>نمودار ۱۵ دقیقه‌ای</h2>
+<div id="chart"></div>
+<div class="muted">خطوط سبز و قرمز محدوده آخرین اردربلاک شناسایی‌شده را نشان می‌دهند.</div>
+</section>
+
+<section class="panel">
+<details open>
+<summary>تنظیمات اردربلاک ۴ ساعته</summary>
+<div class="fields">
+<div class="field"><label for="htf">تایم‌فریم اردربلاک</label><select id="htf"><option value="4h" selected>۴ ساعت</option><option value="12h">۱۲ ساعت</option><option value="1d">روزانه</option></select></div>
+<div class="field"><label for="pivot4">طول پیوت ۴ ساعته</label><input id="pivot4" type="number" min="1" max="10" value="3"></div>
+<div class="field"><label for="bodyLen">میانگین بدنه کندل</label><input id="bodyLen" type="number" min="2" max="50" value="10"></div>
+<div class="field"><label for="obSearch">جست‌وجوی کندل مخالف</label><input id="obSearch" type="number" min="2" max="50" value="12"></div>
+<div class="field"><label for="maxStoredOB">حداکثر OB ذخیره‌شده</label><input id="maxStoredOB" type="number" min="20" max="400" value="200"></div>
+</div>
+<div class="fields" style="margin-top:10px">
+<label class="check"><input id="showBull" type="checkbox" checked> نمایش OB صعودی</label>
+<label class="check"><input id="showBear" type="checkbox" checked> نمایش OB نزولی</label>
+</div>
+</details>
+</section>
+
+<section class="panel">
+<details open>
+<summary>تنظیمات ورود ۱۵ دقیقه‌ای</summary>
+<div class="fields">
+<div class="field"><label for="pivot15">طول پیوت ۱۵ دقیقه</label><input id="pivot15" type="number" min="1" max="10" value="3"></div>
+<div class="field"><label for="maxWait">مهلت انتظار پولبک (کندل)</label><input id="maxWait" type="number" min="1" max="200" value="30"></div>
+<div class="field"><label for="atrLen">دوره ATR</label><input id="atrLen" type="number" min="1" max="100" value="14"></div>
+<div class="field"><label for="maxBarsSinceTouch">حداکثر کندل پس از برخورد</label><input id="maxBarsSinceTouch" type="number" min="1" max="200" value="20"></div>
+<div class="field"><label for="minChochBodyATR">حداقل بدنه شکست (ATR)</label><input id="minChochBodyATR" type="number" min="0" max="2" step=".05" value=".25"></div>
+<div class="field"><label for="retestATR">تلورانس پولبک (ATR)</label><input id="retestATR" type="number" min="0" max="2" step=".05" value=".15"></div>
+<div class="field"><label for="minConfirmBodyATR">حداقل بدنه تأیید (ATR)</label><input id="minConfirmBodyATR" type="number" min="0" max="2" step=".05" value=".20"></div>
+</div>
+<hr>
+<div class="fields">
+<label class="check"><input id="useTrendFilter" type="checkbox" checked> هم‌جهتی روند ۴ ساعته</label>
+<label class="check"><input id="requireOBTouch" type="checkbox" checked> الزام برخورد به OB</label>
+<label class="check"><input id="useTouchFreshness" type="checkbox" checked> فقط برخورد جدید</label>
+<label class="check"><input id="useChochFilter" type="checkbox" checked> الزام شکست CHoCH</label>
+<label class="check"><input id="useChochStrength" type="checkbox" checked> قدرت کندل شکست</label>
+<label class="check"><input id="useRetestFilter" type="checkbox" checked> الزام پولبک به سطح شکست</label>
+<label class="check"><input id="useConfirmCandle" type="checkbox" checked> کندل تأیید هم‌جهت</label>
+<label class="check"><input id="useConfirmStrength" type="checkbox" checked> قدرت کندل تأیید</label>
+</div>
+</details>
+</section>
+
+<section class="panel">
+<details open>
+<summary>مدیریت ریسک</summary>
+<div class="fields">
+<div class="field"><label for="riskPercent">ریسک سرمایه (%)</label><input id="riskPercent" type="number" min=".1" max="5" step=".1" value="1"></div>
+<div class="field"><label for="riskReward">نسبت ریسک به سود</label><select id="riskReward"><option>0.5</option><option>1</option><option>1.5</option><option selected>2</option><option>2.5</option><option>3</option><option>4</option><option>5</option></select></div>
+<div class="field"><label for="slBufferATR">بافر حد ضرر (ATR)</label><input id="slBufferATR" type="number" min="0" max="2" step=".05" value=".15"></div>
+<div class="field"><label for="breakEvenTriggerR">انتقال به سربه‌سر پس از چند R</label><input id="breakEvenTriggerR" type="number" min=".5" max="3" step=".25" value="1"></div>
+</div>
+<hr>
+<div class="fields">
+<label class="check"><input id="useOBBoundarySL" type="checkbox" checked> حد ضرر پشت مرز OB و ساختار</label>
+<label class="check"><input id="useBreakEven" type="checkbox" checked> انتقال حد ضرر به سربه‌سر</label>
+<label class="check"><input id="showSignals" type="checkbox" checked> نمایش سیگنال‌ها</label>
+</div>
+<p class="muted">ریسک سرمایه فقط برای محاسبه نمایشی است. این پنل سفارش واقعی در صرافی باز نمی‌کند.</p>
+</details>
+</section>
+
+<section class="panel">
+<h2>سیگنال‌های پیدا‌شده</h2>
+<div id="signals" class="signals">هنوز اسکن انجام نشده است.</div>
+</section>
+</div>
+
+<aside>
+<section class="panel">
+<h2>وضعیت اسکنر</h2>
+<div class="stats">
+<div class="stat"><b id="total">0</b><small>ارزها</small></div>
+<div class="stat"><b id="buys" class="buy">0</b><small>خرید</small></div>
+<div class="stat"><b id="sells" class="sell">0</b><small>فروش</small></div>
+</div>
+<div id="coins" class="coins">در انتظار اسکن...</div>
+</section>
+<section class="panel">
+<h2>تلگرام</h2>
+<p class="muted">این دکمه اتصال تنظیم‌شده روی سرور را آزمایش می‌کند.</p>
+<button class="primary" id="telegram">تست اتصال تلگرام</button>
+<div id="telegramStatus" class="muted">آزمایش انجام نشده است.</div>
+</section>
+<section class="panel">
+<h2>وضعیت منطق</h2>
+<div class="muted">
+این نسخه تلاش می‌کند اردربلاک را از شکست ساختار ۴ ساعته پیدا کند و سپس برخورد، شکست ساختار و پولبک ۱۵ دقیقه‌ای را بررسی کند. خروجی آن هنوز با بک‌تست Pine تطبیق داده نشده و نباید برای معامله واقعی بدون آزمایش استفاده شود.
+</div>
+</section>
+</aside>
+</div>
+</main>
 
 <script>
 "use strict";
+const $=id=>document.getElementById(id);
+let chart,candleSeries,highLine,lowLine,results=[],timer=null,running=false;
 
-const $ = id => document.getElementById(id);
-
-let chart = null;
-let candleSeries = null;
-let obHighLine = null;
-let obLowLine = null;
-let currentSymbols = [];
-let latestResults = [];
-let scanRunning = false;
-let refreshTimer = null;
-
-const DEFAULT_SYMBOLS = [
-  "BTCUSDT","ETHUSDT","BNBUSDT","SOLUSDT","XRPUSDT",
-  "DOGEUSDT","ADAUSDT","AVAXUSDT","LINKUSDT","LTCUSDT"
-];
-
-function setStatus(message, type="") {
-  const el = $("status");
-  el.textContent = message;
-  el.className = "status " + type;
+function msg(s,error=false){
+  $("status").textContent=s;
+  $("status").className=error?"err":"ok";
 }
-
-function escapeHTML(value) {
-  return String(value).replace(/[&<>"']/g, ch => ({
-    "&":"&amp;",
-    "<":"&lt;",
-    ">":"&gt;",
-    '"':"&quot;",
-    "'":"&#39;"
-  })[ch]);
+function esc(s){
+  return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 }
-
-function normalizeSymbol(value) {
-  return String(value || "")
-    .trim()
-    .toUpperCase()
-    .replace(/^WEEX:/, "")
-    .replace(/[^A-Z0-9_]/g, "");
+function symbols(){
+  return [...new Set($("symbols").value.split(",").map(s=>s.trim().toUpperCase().replace(/^WEEX:/,"").replace(/[^A-Z0-9_]/g,"")).filter(Boolean))].slice(0,10);
 }
-
-function getSymbolsFromInput() {
-  const values = $("symbols").value.split(",");
-  return [...new Set(values.map(normalizeSymbol).filter(Boolean))].slice(0,20);
+function num(id){return Number($(id).value)}
+function checked(id){return $(id).checked}
+function fmt(x){
+  return Number.isFinite(x)?x.toLocaleString("en-US",{maximumFractionDigits:8}):"—";
 }
+async function api(url,options={}){
+  const r=await fetch(url,{cache:"no-store",...options,headers:{"Content-Type":"application/json",...(options.headers||{})}});
+  const t=await r.text();let d;
+  try{d=JSON.parse(t)}catch{throw Error("پاسخ سرور معتبر نیست")}
+  if(!r.ok)throw Error(d.detail||d.message||("HTTP "+r.status));
+  return d;
+}
+async function candles(symbol,tf,limit){
+  const d=await api("/api/klines?symbol="+encodeURIComponent(symbol)+"&interval="+encodeURIComponent(tf)+"&limit="+limit);
+  if(!Array.isArray(d.candles))throw Error("داده کندل موجود نیست");
+  return d.candles.map(c=>({time:+c.time,open:+c.open,high:+c.high,low:+c.low,close:+c.close,volume:+(c.volume||0)}))
+    .filter(c=>Object.values(c).every(Number.isFinite)).sort((a,b)=>a.time-b.time);
+}
+function pivots(cs,left,right){
+  let highs=[],lows=[];
+  for(let i=left;i<cs.length-right;i++){
+    let h=true,l=true;
+    for(let j=i-left;j<=i+right;j++){
+      if(j===i)continue;
+      if(cs[j].high>=cs[i].high)h=false;
+      if(cs[j].low<=cs[i].low)l=false;
+    }
+    if(h)highs.push({i,p:cs[i].high});
+    if(l)lows.push({i,p:cs[i].low});
+  }
+  return {highs,lows};
+}
+function avgBody(cs,end,n){
+  let a=cs.slice(Math.max(0,end-n),end);
+  return a.length?a.reduce((s,c)=>s+Math.abs(c.close-c.open),0)/a.length:0;
+}
+function atr(cs,n){
+  let tr=[];
+  for(let i=1;i<cs.length;i++){
+    tr.push(Math.max(cs[i].high-cs[i].low,Math.abs(cs[i].high-cs[i-1].close),Math.abs(cs[i].low-cs[i-1].close)));
+  }
+  const a=tr.slice(-n);
+  return a.length?a.reduce((s,x)=>s+x,0)/a.length:0;
+}
+function findOB(cs){
+  if(cs.length<Math.max(30,num("pivot4")*2+10))return {ob:null,trend:0};
+  // کندل جاری ممکن است هنوز بسته نشده باشد؛ از آن در تشخیص ساختار استفاده نمی‌کنیم.
+  cs=cs.slice(0,-1);
+  const p=pivots(cs,num("pivot4"),num("pivot4"));
+  let lastPH=null,lastPL=null,trend=0,ob=null;
+  let pi=0,li=0;
+  for(let i=0;i<cs.length;i++){
+    while(pi<p.highs.length&&p.highs[pi].i+num("pivot4")<=i){lastPH=p.highs[pi].p;pi++}
+    while(li<p.lows.length&&p.lows[li].i+num("pivot4")<=i){lastPL=p.lows[li].p;li++}
+    const c=cs[i],prev=cs[i-1];
+    if(!prev)continue;
+    const strong=avgBody(cs,i,num("bodyLen"))>0&&Math.abs(c.close-c.open)>avgBody(cs,i,num("bodyLen"));
+    const bull=lastPH!==null&&c.close>lastPH&&prev.close<=lastPH;
+    const bear=lastPL!==null&&c.close<lastPL&&prev.close>=lastPL;
+    if(bull){trend=1;if(strong){
+      for(let j=1;j<=num("obSearch")&&j<=i;j++)if(cs[i-j].close<cs[i-j].open){ob={side:"BUY",top:cs[i-j].high,bottom:cs[i-j].low,time:cs[i-j].time};break}
+    }}
+    if(bear){trend=-1;if(strong){
+      for(let j=1;j<=num("obSearch")&&j<=i;j++)if(cs[i-j].close>cs[i-j].open){ob={side:"SELL",top:cs[i-j].high,bottom:cs[i-j].low,time:cs[i-j].time};break}
+    }}
+  }
+  return {ob,trend};
+}
+function analyze(symbol,c4,c15){
+  const fail=(reason,ob=null,trend=0)=>({symbol,signal:"NONE",reason,ob,trend});
+  if(c4.length<30||c15.length<30)return fail("داده کافی نیست");
+  const htf=findOB(c4),ob=htf.ob,trend=htf.trend;
+  if(!ob)return fail("اردربلاک بر اساس شکست ساختار پیدا نشد",null,trend);
+  if((ob.side==="BUY"&&!checked("showBull"))||(ob.side==="SELL"&&!checked("showBear")))return fail("نمایش این نوع اردربلاک خاموش است",ob,trend);
+  if(checked("useTrendFilter")&&htf.trend!== (ob.side==="BUY"?1:-1))return fail("روند ۴ ساعته هم‌جهت نیست",ob,trend);
 
-function setupChart() {
-  const container = $("chart");
+  const cs=c15.slice(0,-1); // فقط کندل‌های بسته‌شده
+  const p=pivots(cs,num("pivot15"),num("pivot15"));
+  let ph=null,pl=null,pi=0,li=0;
+  const n=cs.length;
+  let touched=false,touchIndex=-1,choch=false,level=null,chochIndex=-1,entry=null;
+  const tolerance=atr(cs,num("atrLen"))*num("retestATR");
+  const freshLimit=num("maxBarsSinceTouch"),maxWait=num("maxWait");
 
-  chart = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: container.clientHeight,
-    layout: {
-      background: {color:"#131d30"},
-      textColor:"#c7d5e8"
-    },
-    grid: {
-      vertLines:{color:"#1e2a40"},
-      horzLines:{color:"#1e2a40"}
-    },
-    rightPriceScale:{borderColor:"#34445d"},
-    timeScale:{
-      borderColor:"#34445d",
-      timeVisible:true,
-      secondsVisible:false
-    },
-    crosshair:{mode:1}
+  for(let i=0;i<n;i++){
+    while(pi<p.highs.length&&p.highs[pi].i+num("pivot15")<=i){ph=p.highs[pi].p;pi++}
+    while(li<p.lows.length&&p.lows[li].i+num("pivot15")<=i){pl=p.lows[li].p;li++}
+    const c=cs[i],prev=cs[i-1];if(!prev)continue;
+    const hit=c.low<=ob.top&&c.high>=ob.bottom;
+    if(hit){touched=true;touchIndex=i}
+    const touchOK=!checked("requireOBTouch")||(touched&&(!checked("useTouchFreshness")||i-touchIndex<=freshLimit));
+    if(!touchOK)continue;
+    const a=atr(cs.slice(0,i+1),num("atrLen"));
+    const bullBreak=ph!==null&&c.close>ph&&prev.close<=ph&&c.close>c.open;
+    const bearBreak=pl!==null&&c.close<pl&&prev.close>=pl&&c.close<c.open;
+    const strongBull=!checked("useChochStrength")||c.close-c.open>=a*num("minChochBodyATR");
+    const strongBear=!checked("useChochStrength")||c.open-c.close>=a*num("minChochBodyATR");
+    if(!choch&&checked("useChochFilter")){
+      if(ob.side==="BUY"&&bullBreak&&strongBull){choch=true;level=ph;chochIndex=i}
+      if(ob.side==="SELL"&&bearBreak&&strongBear){choch=true;level=pl;chochIndex=i}
+    }else if(!checked("useChochFilter")&&!choch){
+      choch=true;level=ob.side==="BUY"?ph:pl;chochIndex=i;
+    }
+    if(choch&&i-chochIndex>maxWait){choch=false;level=null;chochIndex=-1}
+    if(!choch||i<=chochIndex)continue;
+    const retestLevel=level;
+    const retestOK=!checked("useRetestFilter")||(retestLevel!==null&&c.low<=retestLevel+tolerance&&c.high>=retestLevel-tolerance);
+    if(!retestOK)continue;
+    const directional=ob.side==="BUY"
+      ?(!checked("useConfirmCandle")||(c.close>c.open&&(!checked("useRetestFilter")||retestLevel===null||c.close>retestLevel)))
+      :(!checked("useConfirmCandle")||(c.close<c.open&&(!checked("useRetestFilter")||retestLevel===null||c.close<retestLevel)));
+    const confirmStrong=!checked("useConfirmStrength")||(ob.side==="BUY"?c.close-c.open:c.open-c.close)>=a*num("minConfirmBodyATR");
+    if(!directional||!confirmStrong)continue;
+    entry={i,c,ph,pl,a};break;
+  }
+  if(!entry)return fail(touched?"برخورد دیده شد، اما شکست و پولبک کامل تأیید نشد":"منتظر برخورد قیمت به اردربلاک",ob,trend);
+  const c=entry.c,a=entry.a;
+  let sl;
+  if(ob.side==="BUY"){
+    if(entry.pl===null)return fail("پیوت کف برای حد ضرر موجود نیست",ob,trend);
+    sl=(checked("useOBBoundarySL")?Math.min(entry.pl,ob.bottom):entry.pl)-a*num("slBufferATR");
+  }else{
+    if(entry.ph===null)return fail("پیوت سقف برای حد ضرر موجود نیست",ob,trend);
+    sl=(checked("useOBBoundarySL")?Math.max(entry.ph,ob.top):entry.ph)+a*num("slBufferATR");
+  }
+  const risk=ob.side==="BUY"?c.close-sl:sl-c.close;
+  if(risk<=0)return fail("حد ضرر معتبر محاسبه نشد",ob,trend);
+  return {symbol,signal:ob.side,reason:"شرایط ورود در کندل بسته‌شده بررسی شد",ob,trend,entry:c.close,sl,tp:ob.side==="BUY"?c.close+risk*num("riskReward"):c.close-risk*num("riskReward"),time:c.time};
+}
+function initChart(){
+  chart=LightweightCharts.createChart($("chart"),{
+    width:$("chart").clientWidth,height:$("chart").clientHeight,
+    layout:{background:{color:"#131d30"},textColor:"#c7d5e8"},
+    grid:{vertLines:{color:"#1e2a40"},horzLines:{color:"#1e2a40"}},
+    timeScale:{timeVisible:true,borderColor:"#34445d"},
+    rightPriceScale:{borderColor:"#34445d"}
   });
-
-  candleSeries = chart.addCandlestickSeries({
-    upColor:"#20c997",
-    downColor:"#ff5d73",
-    borderUpColor:"#20c997",
-    borderDownColor:"#ff5d73",
-    wickUpColor:"#20c997",
-    wickDownColor:"#ff5d73"
+  candleSeries=chart.addCandlestickSeries({
+    upColor:"#20c997",downColor:"#ff5d73",
+    borderUpColor:"#20c997",borderDownColor:"#ff5d73",
+    wickUpColor:"#20c997",wickDownColor:"#ff5d73"
   });
-
-  window.addEventListener("resize", () => {
-    if (!chart) return;
-    chart.applyOptions({
-      width:container.clientWidth,
-      height:container.clientHeight
-    });
-  });
+  window.addEventListener("resize",()=>chart.applyOptions({width:$("chart").clientWidth,height:$("chart").clientHeight}));
 }
-
-async function getJSON(url, options={}) {
-  const response = await fetch(url, {
-    cache:"no-store",
-    ...options,
-    headers:{
-      "Content-Type":"application/json",
-      ...(options.headers || {})
-    }
-  });
-
-  const text = await response.text();
-  let data;
-
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error("پاسخ سرور JSON معتبر نیست.");
+async function drawChart(symbol){
+  const cs=await candles(symbol,"15m",num("limit"));
+  candleSeries.setData(cs.map(c=>({time:c.time,open:c.open,high:c.high,low:c.low,close:c.close})));
+  if(highLine)candleSeries.removePriceLine(highLine);
+  if(lowLine)candleSeries.removePriceLine(lowLine);
+  const r=results.find(x=>x.symbol===symbol);
+  if(r&&r.ob){
+    highLine=candleSeries.createPriceLine({price:r.ob.top,color:r.ob.side==="BUY"?"#20c997":"#ff687b",lineStyle:2,title:"OB بالا"});
+    lowLine=candleSeries.createPriceLine({price:r.ob.bottom,color:r.ob.side==="BUY"?"#20c997":"#ff687b",lineStyle:2,title:"OB پایین"});
   }
-
-  if (!response.ok) {
-    throw new Error(
-      data.detail || data.message || ("خطای سرور: " + response.status)
-    );
-  }
-
-  return data;
+  chart.timeScale().fitContent();
 }
-
-async function getCandles(symbol, interval, limit) {
-  const url =
-    "/api/klines?symbol=" + encodeURIComponent(symbol) +
-    "&interval=" + encodeURIComponent(interval) +
-    "&limit=" + encodeURIComponent(limit);
-
-  const data = await getJSON(url);
-
-  if (!Array.isArray(data.candles)) {
-    throw new Error("ساختار داده کندل نامعتبر است: " + symbol);
+function render(){
+  $("total").textContent=results.length;
+  $("buys").textContent=results.filter(r=>r.signal==="BUY").length;
+  $("sells").textContent=results.filter(r=>r.signal==="SELL").length;
+  $("coins").innerHTML="";
+  $("signals").innerHTML="";
+  for(const r of results){
+    const b=document.createElement("button");b.className="coin";
+    b.innerHTML="<span>"+esc(r.symbol)+"</span><span class='badge "+(r.signal==="BUY"?"buy":r.signal==="SELL"?"sell":"neutral")+"'>"+(r.signal==="BUY"?"خرید":r.signal==="SELL"?"فروش":"بدون سیگنال")+"</span>";
+    b.onclick=async()=>{$("chartSymbol").value=r.symbol;try{await drawChart(r.symbol)}catch(e){msg(e.message,true)}};
+    $("coins").appendChild(b);
+    if(r.signal!=="NONE"&&checked("showSignals")){
+      const d=document.createElement("div");d.className="signal";
+      d.innerHTML="<b>"+esc(r.symbol)+"</b> — <span class='"+(r.signal==="BUY"?"buy":"sell")+"'>"+(r.signal==="BUY"?"خرید":"فروش")+"</span><br>ورود احتمالی: "+fmt(r.entry)+"<br>حد ضرر محاسباتی: "+fmt(r.sl)+"<br>هدف محاسباتی: "+fmt(r.tp)+"<br><small>"+esc(r.reason)+"</small>";
+      $("signals").appendChild(d);
+    }
   }
-
-  return data.candles
-    .map(c => ({
-      time:Number(c.time),
-      open:Number(c.open),
-      high:Number(c.high),
-      low:Number(c.low),
-      close:Number(c.close),
-      volume:Number(c.volume || 0)
-    }))
-    .filter(c =>
-      Number.isFinite(c.time) &&
-      Number.isFinite(c.open) &&
-      Number.isFinite(c.high) &&
-      Number.isFinite(c.low) &&
-      Number.isFinite(c.close)
-    )
-    .sort((a,b) => a.time-b.time);
+  if(!$("signals").children.length)$("signals").textContent="فعلاً سیگنال واجد شرایط پیدا نشد.";
 }
-
-function body(c) {
-  return Math.abs(c.close-c.open);
-}
-
-function averageBody(candles, end, count=10) {
-  const start = Math.max(0, end-count);
-  const part = candles.slice(start,end);
-  if (!part.length) return 0;
-
-  return part.reduce((sum,c)=>sum+body(c),0)/part.length;
-}
-
-/*
-  شناسایی اولیه OB:
-  - یک کندل مخالف حرکت
-  - سپس حرکت قوی
-  - و عبور از سقف/کف چند کندل قبلی
-
-  این الگوریتم یک تقریب است و جایگزین دقیق Pine Script نیست.
-*/
-function findOrderBlock(candles) {
-  if (candles.length < 25) return null;
-
-  const multiplier = Number($("impulse").value);
-  const start = Math.max(5,candles.length-80);
-
-  for (let i=candles.length-2; i>=start; i--) {
-    const c = candles[i];
-    const avg = averageBody(candles,i,10);
-
-    if (avg <= 0 || body(c) < avg*multiplier) continue;
-
-    const previous = candles.slice(Math.max(0,i-5),i);
-    if (previous.length < 3) continue;
-
-    const previousHigh = Math.max(...previous.map(x=>x.high));
-    const previousLow = Math.min(...previous.map(x=>x.low));
-
-    // اردربلاک صعودی: آخرین کندل نزولی پیش از حرکت صعودی
-    if (c.close > c.open && c.close > previousHigh) {
-      for (let j=i-1; j>=Math.max(0,i-5); j--) {
-        const candidate = candles[j];
-
-        if (candidate.close < candidate.open) {
-          return {
-            side:"BUY",
-            high:candidate.high,
-            low:candidate.low,
-            time:candidate.time,
-            impulseTime:c.time
-          };
-        }
-      }
-    }
-
-    // اردربلاک نزولی: آخرین کندل صعودی پیش از حرکت نزولی
-    if (c.close < c.open && c.close < previousLow) {
-      for (let j=i-1; j>=Math.max(0,i-5); j--) {
-        const candidate = candles[j];
-
-        if (candidate.close > candidate.open) {
-          return {
-            side:"SELL",
-            high:candidate.high,
-            low:candidate.low,
-            time:candidate.time,
-            impulseTime:c.time
-          };
-        }
-      }
-    }
-  }
-
-  return null;
-}
-
-function analyzeSymbol(symbol, candles4h, candles15m) {
-  const obEnabled = $("fOB").checked;
-  const retestEnabled = $("fRetest").checked;
-  const confirmEnabled = $("fConfirm").checked;
-  const trendEnabled = $("fTrend").checked;
-
-  const result = {
-    symbol,
-    signal:"NONE",
-    reason:"هنوز شرایط ورود تأیید نشده است.",
-    ob:null,
-    price:candles15m.length ? candles15m[candles15m.length-1].close : null,
-    entry:null,
-    sl:null,
-    tp:null
-  };
-
-  if (candles4h.length < 25 || candles15m.length < 5) {
-    result.reason = "داده کافی نیست.";
-    return result;
-  }
-
-  const ob = obEnabled ? findOrderBlock(candles4h) : null;
-  result.ob = ob;
-
-  if (obEnabled && !ob) {
-    result.reason = "اردربلاک معتبر پیدا نشد.";
-    return result;
-  }
-
-  if (!ob) {
-    result.reason = "فیلتر اردربلاک خاموش است؛ برای جلوگیری از سیگنال بی‌پایه، ورود صادر نشد.";
-    return result;
-  }
-
-  const last = candles15m[candles15m.length-1];
-  const previous = candles15m[candles15m.length-2];
-
-  const touched =
-    last.low <= ob.high &&
-    last.high >= ob.low;
-
-  const bullishConfirm =
-    last.close > last.open &&
-    last.close > previous.close;
-
-  const bearishConfirm =
-    last.close < last.open &&
-    last.close < previous.close;
-
-  if (retestEnabled && !touched) {
-    result.reason = "هنوز برخورد ۱۵ دقیقه‌ای به محدوده اردربلاک دیده نشده است.";
-    return result;
-  }
-
-  if (trendEnabled) {
-    const trendSlice = candles15m.slice(-20);
-    const mean = trendSlice.reduce((s,c)=>s+c.close,0)/trendSlice.length;
-
-    if (ob.side === "BUY" && last.close < mean) {
-      result.reason = "فیلتر روند، خرید را تأیید نمی‌کند.";
-      return result;
-    }
-
-    if (ob.side === "SELL" && last.close > mean) {
-      result.reason = "فیلتر روند، فروش را تأیید نمی‌کند.";
-      return result;
-    }
-  }
-
-  if (ob.side === "BUY") {
-    if (confirmEnabled && !bullishConfirm) {
-      result.reason = "برخورد دیده شده، اما کندل صعودی تأیید نشده است.";
-      return result;
-    }
-
-    result.signal = "BUY";
-    result.reason = "اردربلاک صعودی و شرایط تأیید ورود بررسی شدند.";
-    result.entry = last.close;
-    result.sl = ob.low;
-    const risk = result.entry-result.sl;
-
-    if (risk <= 0) {
-      result.signal = "NONE";
-      result.reason = "حد ضرر معتبر محاسبه نشد.";
-      return result;
-    }
-
-    result.tp = result.entry + risk*Number($("rr").value);
-  } else {
-    if (confirmEnabled && !bearishConfirm) {
-      result.reason = "برخورد دیده شده، اما کندل نزولی تأیید نشده است.";
-      return result;
-    }
-
-    result.signal = "SELL";
-    result.reason = "اردربلاک نزولی و شرایط تأیید ورود بررسی شدند.";
-    result.entry = last.close;
-    result.sl = ob.high;
-    const risk = result.sl-result.entry;
-
-    if (risk <= 0) {
-      result.signal = "NONE";
-      result.reason = "حد ضرر معتبر محاسبه نشد.";
-      return result;
-    }
-
-    result.tp = result.entry - risk*Number($("rr").value);
-  }
-
-  return result;
-}
-
-function renderCoinList(results) {
-  const el = $("coinList");
-  el.innerHTML = "";
-
-  for (const result of results) {
-    const button = document.createElement("button");
-    button.className = "coin" +
-      (result.symbol === $("chartSymbol").value ? " active" : "");
-
-    const badgeClass =
-      result.signal === "BUY" ? "buy" :
-      result.signal === "SELL" ? "sell" : "neutral";
-
-    const label =
-      result.signal === "BUY" ? "خرید" :
-      result.signal === "SELL" ? "فروش" : "بدون سیگنال";
-
-    button.innerHTML =
-      "<span>" + escapeHTML(result.symbol) + "</span>" +
-      '<span class="badge ' + badgeClass + '">' + label + "</span>";
-
-    button.addEventListener("click", async () => {
-      $("chartSymbol").value = result.symbol;
-      await loadChart(result.symbol);
-      renderCoinList(results);
-    });
-
-    el.appendChild(button);
-  }
-}
-
-function renderSignals(results) {
-  const el = $("signals");
-  const active = results.filter(r=>r.signal!=="NONE");
-
-  if (!active.length) {
-    el.innerHTML =
-      '<div class="signal-card">در حال حاضر سیگنال تأییدشده‌ای پیدا نشد. ' +
-      'این به معنی خرابی اسکنر نیست؛ ممکن است شرایط ورود فراهم نباشد.</div>';
-    return;
-  }
-
-  el.innerHTML = "";
-
-  for (const r of active) {
-    const side = r.signal === "BUY" ? "خرید" : "فروش";
-    const cls = r.signal === "BUY" ? "buy" : "sell";
-
-    const div = document.createElement("div");
-    div.className = "signal-card";
-
-    div.innerHTML =
-      "<strong>" + escapeHTML(r.symbol) + "</strong> " +
-      '<span class="badge ' + cls + '">' + side + "</span><br>" +
-      "ورود احتمالی: " + formatPrice(r.entry) + "<br>" +
-      "حد ضرر محاسباتی: " + formatPrice(r.sl) + "<br>" +
-      "هدف محاسباتی: " + formatPrice(r.tp) + "<br>" +
-      '<span class="small">' + escapeHTML(r.reason) + "</span>";
-
-    el.appendChild(div);
-  }
-}
-
-function formatPrice(value) {
-  if (!Number.isFinite(Number(value))) return "—";
-
-  return Number(value).toLocaleString("en-US", {
-    maximumFractionDigits:8
-  });
-}
-
-function renderStats(results) {
-  $("countTotal").textContent = results.length;
-  $("countBuy").textContent = results.filter(r=>r.signal==="BUY").length;
-  $("countSell").textContent = results.filter(r=>r.signal==="SELL").length;
-}
-
-async function loadChart(symbol) {
-  if (!symbol) return;
-
-  try {
-    const candles = await getCandles(
-      symbol,"15m",Number($("limit").value)
-    );
-
-    if (!candles.length) {
-      throw new Error("داده‌ای برای نمودار دریافت نشد.");
-    }
-
-    candleSeries.setData(candles.map(c=>({
-      time:c.time,
-      open:c.open,
-      high:c.high,
-      low:c.low,
-      close:c.close
-    })));
-
-    if (obHighLine) {
-      candleSeries.removePriceLine(obHighLine);
-      obHighLine = null;
-    }
-
-    if (obLowLine) {
-      candleSeries.removePriceLine(obLowLine);
-      obLowLine = null;
-    }
-
-    const result = latestResults.find(r=>r.symbol===symbol);
-
-    if (result && result.ob) {
-      obHighLine = candleSeries.createPriceLine({
-        price:result.ob.high,
-        color:"#20c997",
-        lineWidth:1,
-        lineStyle:2,
-        axisLabelVisible:true,
-        title:"OB بالا"
-      });
-
-      obLowLine = candleSeries.createPriceLine({
-        price:result.ob.low,
-        color:"#ff5d73",
-        lineWidth:1,
-        lineStyle:2,
-        axisLabelVisible:true,
-        title:"OB پایین"
-      });
-    }
-
-    chart.timeScale().fitContent();
-  } catch (error) {
-    setStatus("خطای نمودار: " + error.message,"error");
-  }
-}
-
-async function scanAll() {
-  if (scanRunning) return;
-
-  const symbols = getSymbolsFromInput();
-
-  if (!symbols.length) {
-    setStatus("حداقل یک نماد وارد کن.","error");
-    return;
-  }
-
-  scanRunning = true;
-  $("scanButton").disabled = true;
-  setStatus("در حال دریافت اطلاعات و اسکن ارزها...");
-
-  try {
-    const results = [];
-    const limit = Number($("limit").value);
-
-    for (const symbol of symbols) {
-      try {
-        const [candles4h,candles15m] = await Promise.all([
-          getCandles(symbol,"4h",Math.min(limit,200)),
-          getCandles(symbol,"15m",Math.min(limit,500))
+async function scan(){
+  if(running)return;
+  running=true;$("scan").disabled=true;msg("در حال دریافت داده‌های ۴ ساعته و ۱۵ دقیقه‌ای...");
+  try{
+    const syms=symbols();if(!syms.length)throw Error("حداقل یک نماد وارد کن");
+    if(syms.length>10)throw Error("حداکثر ۱۰ ارز مجاز است");
+    results=[];
+    for(const s of syms){
+      try{
+        const [c4,c15]=await Promise.all([
+          candles(s,$("htf").value,Math.min(num("limit"),500)),
+          candles(s,"15m",Math.min(num("limit"),500))
         ]);
-
-        results.push(analyzeSymbol(symbol,candles4h,candles15m));
-      } catch (error) {
-        results.push({
-          symbol,
-          signal:"NONE",
-          reason:"خطای دریافت اطلاعات: " + error.message,
-          ob:null
-        });
-      }
+        results.push(analyze(s,c4,c15));
+      }catch(e){results.push({symbol:s,signal:"NONE",reason:"خطای دریافت داده: "+e.message,ob:null})}
     }
-
-    latestResults = results;
-
-    $("chartSymbol").innerHTML = "";
-    for (const symbol of symbols) {
-      const option = document.createElement("option");
-      option.value = symbol;
-      option.textContent = symbol;
-      $("chartSymbol").appendChild(option);
-    }
-
-    if (!symbols.includes($("chartSymbol").value)) {
-      $("chartSymbol").value = symbols[0];
-    }
-
-    renderCoinList(results);
-    renderSignals(results);
-    renderStats(results);
-
-    const failures = results.filter(r=>
-      r.reason.startsWith("خطای دریافت")
-    ).length;
-
-    if (failures === results.length) {
-      setStatus(
-        "دریافت داده برای همه ارزها ناموفق بود. پیام خطاهای هر ارز را بررسی کن.",
-        "error"
-      );
-    } else if (failures > 0) {
-      setStatus(
-        "اسکن تمام شد؛ " + failures + " ارز خطای دریافت داشت.",
-        "error"
-      );
-    } else {
-      setStatus(
-        "اسکن انجام شد: " + results.length +
-        " ارز بررسی شدند. سیگنال‌ها فقط بر اساس شروط این نسخه آزمایشی هستند.",
-        "ok"
-      );
-    }
-
-    await loadChart($("chartSymbol").value);
-
-  } catch (error) {
-    setStatus("خطای اسکن: " + error.message,"error");
-  } finally {
-    scanRunning = false;
-    $("scanButton").disabled = false;
-  }
+    $("chartSymbol").innerHTML="";
+    for(const s of syms){const o=document.createElement("option");o.value=s;o.textContent=s;$("chartSymbol").appendChild(o)}
+    render();
+    const good=results.filter(r=>!r.reason.startsWith("خطای دریافت داده")).length;
+    msg("اسکن تمام شد؛ "+good+" از "+results.length+" ارز با موفقیت بررسی شدند.",good?"":"error");
+    if(syms.includes($("chartSymbol").value))await drawChart($("chartSymbol").value);
+    else{$("chartSymbol").value=syms[0];await drawChart(syms[0])}
+  }catch(e){msg("خطا: "+e.message,true)}
+  finally{$("scan").disabled=false;running=false}
 }
-
-async function saveSymbols() {
-  const symbols = getSymbolsFromInput();
-
-  if (!symbols.length) {
-    setStatus("حداقل یک نماد معتبر وارد کن.","error");
-    return;
-  }
-
-  $("symbols").value = symbols.join(",");
-  currentSymbols = symbols;
-
-  try {
-    await getJSON("/api/symbols",{
-      method:"POST",
-      body:JSON.stringify({symbols})
-    });
-
-    setStatus("فهرست ارزها در سرور ذخیره شد.","ok");
-  } catch (error) {
-    // فهرست همین صفحه همچنان قابل استفاده است.
-    setStatus(
-      "فهرست برای همین صفحه تنظیم شد؛ ذخیره در سرور موفق نبود: " +
-      error.message,
-      "error"
-    );
-  }
-
-  await scanAll();
+async function saveSymbols(){
+  const syms=symbols();if(!syms.length){msg("نماد معتبر وارد کن",true);return}
+  $("symbols").value=syms.join(",");
+  try{
+    await api("/api/symbols",{method:"POST",body:JSON.stringify({symbols:syms})});
+    msg("فهرست ارزها ذخیره شد.");
+  }catch(e){msg("فهرست در همین صفحه تنظیم شد؛ ذخیره سرور ناموفق بود: "+e.message,true)}
+  await scan();
 }
-
-async function testTelegram() {
-  const el = $("telegramStatus");
-  el.textContent = "در حال آزمایش اتصال تلگرام...";
-  el.className = "status";
-
-  try {
-    const result = await getJSON("/api/telegram-test",{
-      method:"POST",
-      body:JSON.stringify({
-        message:"آزمایش اتصال اسکنر فارسی WEEX"
-      })
-    });
-
-    el.textContent =
-      result.message || result.status || "درخواست تست به سرور ارسال شد.";
-    el.className = "status ok";
-  } catch (error) {
-    el.textContent = "خطای تست تلگرام: " + error.message;
-    el.className = "status error";
-  }
-}
-
-async function loadSavedSymbols() {
-  try {
-    const data = await getJSON("/api/symbols");
-
-    let symbols = [];
-
-    if (Array.isArray(data)) {
-      symbols = data;
-    } else if (Array.isArray(data.symbols)) {
-      symbols = data.symbols;
-    }
-
-    symbols = symbols.map(normalizeSymbol).filter(Boolean);
-
-    if (symbols.length) {
-      $("symbols").value = symbols.join(",");
-    }
-  } catch (error) {
-    // در صورت در دسترس نبودن فهرست سرور، از نمادهای پیش‌فرض استفاده می‌شود.
-  }
-}
-
-function updateRefreshTimer() {
-  if (refreshTimer) clearInterval(refreshTimer);
-
-  if ($("autoRefresh").checked) {
-    refreshTimer = setInterval(scanAll,60000);
-  }
-}
-
-$("scanButton").addEventListener("click",scanAll);
-$("saveSymbols").addEventListener("click",saveSymbols);
-$("telegramButton").addEventListener("click",testTelegram);
-$("chartSymbol").addEventListener("change",()=>{
-  loadChart($("chartSymbol").value);
+$("telegram").onclick=async()=>{
+  $("telegramStatus").textContent="در حال آزمایش...";
+  try{
+    const r=await api("/api/telegram-test",{method:"POST",body:JSON.stringify({message:"آزمایش اتصال اسکنر فارسی WEEX"})});
+    $("telegramStatus").textContent=r.message||r.status||"درخواست تست ارسال شد";
+  }catch(e){$("telegramStatus").textContent="خطای تلگرام: "+e.message}
+};
+$("scan").onclick=scan;
+$("save").onclick=saveSymbols;
+$("chartSymbol").onchange=()=>drawChart($("chartSymbol").value).catch(e=>msg(e.message,true));
+$("auto").onchange=()=>{if(timer)clearInterval(timer);if(checked("auto"))timer=setInterval(scan,60000)};
+document.querySelectorAll("input,select").forEach(el=>{
+  if(["symbols","chartSymbol","limit","auto"].includes(el.id))return;
+  el.addEventListener("change",()=>{if(results.length)scan()});
 });
-$("autoRefresh").addEventListener("change",updateRefreshTimer);
-
-for (const id of ["fOB","fRetest","fConfirm","fTrend","impulse","rr"]) {
-  $(id).addEventListener("change",scanAll);
+async function init(){
+  initChart();
+  try{
+    const d=await api("/api/symbols");
+    const syms=Array.isArray(d)?d:d.symbols;
+    if(Array.isArray(syms)&&syms.length)$("symbols").value=syms.join(",");
+  }catch(e){}
+  if(checked("auto"))timer=setInterval(scan,60000);
+  await scan();
 }
-
-$("limit").addEventListener("change",scanAll);
-
-async function init() {
-  setupChart();
-  await loadSavedSymbols();
-
-  currentSymbols = getSymbolsFromInput();
-  $("chartSymbol").innerHTML = "";
-
-  for (const symbol of currentSymbols) {
-    const option = document.createElement("option");
-    option.value = symbol;
-    option.textContent = symbol;
-    $("chartSymbol").appendChild(option);
-  }
-
-  updateRefreshTimer();
-  await scanAll();
-}
-
 init();
 </script>
-
 </body>
 </html>
