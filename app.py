@@ -1,4 +1,3 @@
-```python
 import os
 import json
 from pathlib import Path
@@ -316,4 +315,3 @@ def telegram_test(message: TelegramMessage | None = None):
             detail="ارسال پیام ناموفق بود؛ تنظیمات تلگرام و "
                    "ارتباط سرور را بررسی کنید."
         )
-```
